@@ -1,33 +1,77 @@
-\# dlc-iam-api
+# DLC IAM API
 
+DLC Identity and Access Management microservice, developed with Java 21 and Spring Boot 3.5.0.
 
+**Current status:** project skeleton. IAM use cases, endpoints, and persistence adapters have not yet been implemented.
 
-> iam bounded context: service API
+## Project Structure
 
+The project is organized into three Maven modules following the hexagonal architecture defined in Appendix C:
 
+```text
+dlc-iam-api/
+├── .github/
+│   ├── pull_request_template.md
+│   └── workflows/
+│       └── ci.yml
+├── deploy/
+│   └── .gitkeep
+├── iam-core/
+│   ├── pom.xml
+│   └── src/
+│       ├── main/java/co/edu/corhuila/dlc/iam/
+│       │   ├── application/
+│       │   │   ├── port/
+│       │   │   │   ├── in/package-info.java
+│       │   │   │   └── out/package-info.java
+│       │   │   └── usecase/package-info.java
+│       │   └── domain/model/package-info.java
+│       └── test/java/co/edu/corhuila/dlc/iam/application/usecase/.gitkeep
+├── iam-adapters/
+│   ├── pom.xml
+│   └── src/
+│       ├── main/java/co/edu/corhuila/dlc/iam/adapter/
+│       │   ├── in/http/package-info.java
+│       │   └── out/persistence/package-info.java
+│       └── test/java/co/edu/corhuila/dlc/iam/adapter/out/persistence/.gitkeep
+├── iam-app/
+│   ├── pom.xml
+│   └── src/
+│       ├── main/
+│       │   ├── java/co/edu/corhuila/dlc/iam/app/IamApplication.java
+│       │   └── resources/application.yml
+│       └── test/java/co/edu/corhuila/dlc/iam/app/.gitkeep
+├── .env.example
+├── .gitignore
+├── pom.xml
+└── README.md
+```
 
-Part of the \*\*LMS Library\*\* distributed system — team `lms-library`, Grupo 2. Governance and documentation live in \[`library-docs`](https://github.com/code-corhuila/library-docs).
+### Responsibility of Each Module
 
+- **`iam-core`**: contains the domain, use cases, and input (`in`) and output (`out`) ports. Currently, it only defines the base packages.
+- **`iam-adapters`**: contains the HTTP entry points and output adapters for persistence. Currently, it only defines the base packages and depends on `iam-core`.
+- **`iam-app`**: contains `IamApplication`, the initial Spring Boot configuration, and the dependencies required to assemble the modules.
 
+The `package-info.java` files preserve the Java packages within the project skeleton. The `.gitkeep` files allow empty test and deployment directories to be tracked by Git.
 
-\## Branching
+## Database and Migrations
 
+IAM is responsible for its own data. PostgreSQL definitions and migrations are managed in the database infrastructure repository; this repository contains the IAM API.
 
+During normal operation, IAM accesses its persistence layer through its own adapters. The Migration API is used to execute database migrations and is not part of the microservice's regular operations.
 
-Three permanent branches. \*\*None of them accepts a direct commit\*\* — you enter through a child branch and leave through a Pull Request.
-develop  <--PR--  feat/... fix/... chore/...
+## Requirements
 
-qa       <--PR--  qa/...
+- Java 21
+- Maven compatible with Spring Boot 3.5.0
 
-main     <--PR--  release/...  hotfix/…
+## Build
 
-Promotion happens \*\*by re-application\*\* (`git cherry-pick -x`), never by merging one permanent branch into another: `merge develop -> qa` and `merge qa -> main` do not exist in this model.
+From the repository root:
 
+```bash
+mvn clean verify
+```
 
-
-`main` requires \*\*1 approval from `ariel5253`\*\*. On `develop` and `qa` the team sets its own review rule.
-
-
-
-Full policy: `00-governance/branching-policy.md` in `library-docs`.
-
+The command above builds all three modules. Currently, no functional IAM tests have been implemented.
