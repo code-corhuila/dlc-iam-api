@@ -57,9 +57,9 @@ The `package-info.java` files preserve the Java packages within the project skel
 
 ## Database and Migrations
 
-IAM is responsible for its own data. PostgreSQL definitions and migrations are managed in the database infrastructure repository; this repository contains the IAM API.
+IAM owns its data in the `iam` PostgreSQL schema. `dlc-infra-postgres` supplies the shared PostgreSQL engine, while `dlc-iam-db` owns IAM schema definitions, Liquibase changesets, and migration tooling. This repository contains the IAM API.
 
-During normal operation, IAM accesses its persistence layer through its own adapters. The Migration API is used to execute database migrations and is not part of the microservice's regular operations.
+During normal operation, the API must use an IAM-scoped runtime role through its persistence adapters. Liquibase migrations run separately with the IAM migrator role; the API does not execute them. Persistence adapters and database connectivity have not yet been implemented in this scaffold.
 
 ## Requirements
 
