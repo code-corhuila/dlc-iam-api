@@ -23,8 +23,10 @@ and the separate `iam_migrator` role; the API never runs migrations. Apply the
 rows with a missing name require an owner-reviewed backfill; login rejects them
 without inventing a name.
 
-This slice does not complete the full HU. HU-IAM-005 supplies failed-attempt
-account locking and the 10-attempts/IP limit. HU-IAM-006 supplies refresh
+This slice adds three-failure account locking, 15-minute expiry, and
+`UserLocked`/`UserUnlocked` outbox records. HU-IAM-005 still requires the
+independent 10-attempts/IP limit and authorized administrator unlock.
+HU-IAM-006 supplies refresh
 rotation, CSRF, logout, session inspection/revocation and current-session
 eligibility checks. Outbox delivery and consumer deduplication also require
 integration evidence. Until those changes are integrated, do not treat this
