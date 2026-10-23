@@ -1,77 +1,58 @@
 # DLC IAM API
 
-DLC Identity and Access Management microservice, developed with Java 21 and Spring Boot 3.5.0.
+Java 21 and Spring Boot 3.5.0 implementation of the IAM owner service. The
+three Maven modules keep application rules (`iam-core`), HTTP/PostgreSQL/key
+adapters (`iam-adapters`), and assembly (`iam-app`) separate.
 
-**Current status:** project skeleton. IAM use cases, endpoints, and persistence adapters have not yet been implemented.
+## HU-IAM-001 login slice
 
-## Project Structure
+`POST /api/v1/auth/login` validates a staff password and requires an active,
+verified account with at least one approved internal role and a persisted
+display name. It creates an IAM session, one refresh family and hashed refresh
+credential, and a `SessionStarted` outbox row in one PostgreSQL transaction.
+The response contains a one-hour RS256 access token and public staff fields;
+the seven-day opaque refresh credential is sent only in a Secure, HttpOnly,
+SameSite=Strict cookie. Invalid credentials and ineligible accounts receive the
+same generic 401. `GET /api/v1/auth/jwks` publishes only the configured public
+RSA key. No MFA challenge is issued under ADR-016.
 
-The project is organized into three Maven modules following the hexagonal architecture defined in Appendix C:
+The API connects as `iam_runtime` and reads/writes only the `iam` schema.
+`dlc-infra-postgres` supplies the engine. `dlc-iam-db` owns Liquibase migrations
+and the separate `iam_migrator` role; the API never runs migrations. Apply the
+`dlc-iam-db` staff display-name migration before this API revision. Existing
+rows with a missing name require an owner-reviewed backfill; login rejects them
+without inventing a name.
 
-```text
-dlc-iam-api/
-├── .github/
-│   ├── pull_request_template.md
-│   └── workflows/
-│       └── ci.yml
-├── deploy/
-│   └── .gitkeep
-├── iam-core/
-│   ├── pom.xml
-│   └── src/
-│       ├── main/java/co/edu/corhuila/dlc/iam/
-│       │   ├── application/
-│       │   │   ├── port/
-│       │   │   │   ├── in/package-info.java
-│       │   │   │   └── out/package-info.java
-│       │   │   └── usecase/package-info.java
-│       │   └── domain/model/package-info.java
-│       └── test/java/co/edu/corhuila/dlc/iam/application/usecase/.gitkeep
-├── iam-adapters/
-│   ├── pom.xml
-│   └── src/
-│       ├── main/java/co/edu/corhuila/dlc/iam/adapter/
-│       │   ├── in/http/package-info.java
-│       │   └── out/persistence/package-info.java
-│       └── test/java/co/edu/corhuila/dlc/iam/adapter/out/persistence/.gitkeep
-├── iam-app/
-│   ├── pom.xml
-│   └── src/
-│       ├── main/
-│       │   ├── java/co/edu/corhuila/dlc/iam/app/IamApplication.java
-│       │   └── resources/application.yml
-│       └── test/java/co/edu/corhuila/dlc/iam/app/.gitkeep
-├── .env.example
-├── .gitignore
-├── pom.xml
-└── README.md
-```
+This slice does not complete the full HU. HU-IAM-005 supplies failed-attempt
+account locking and the 10-attempts/IP limit. HU-IAM-006 supplies refresh
+rotation, CSRF, logout, session inspection/revocation and current-session
+eligibility checks. Outbox delivery and consumer deduplication also require
+integration evidence. Until those changes are integrated, do not treat this
+login endpoint as a complete deployable authentication flow.
 
-### Responsibility of Each Module
+## Configuration
 
-- **`iam-core`**: contains the domain, use cases, and input (`in`) and output (`out`) ports. Currently, it only defines the base packages.
-- **`iam-adapters`**: contains the HTTP entry points and output adapters for persistence. Currently, it only defines the base packages and depends on `iam-core`.
-- **`iam-app`**: contains `IamApplication`, the initial Spring Boot configuration, and the dependencies required to assemble the modules.
+Provide the variables listed in `.env.example` through the deployment secret
+mechanism. `IAM_DATABASE_USER` must be `iam_runtime` or an equivalently scoped
+role; never use the migrator or bootstrap account. The private key must be an
+RSA PKCS#8 PEM and the public key an X.509 PEM. `IAM_JWT_KID`, issuer and
+audience must match the verifier allowlist. No key or password is committed.
 
-The `package-info.java` files preserve the Java packages within the project skeleton. The `.gitkeep` files allow empty test and deployment directories to be tracked by Git.
+The `iam` database schema must already exist. HTTP routes use the gateway
+relative `/api/v1/auth` prefix. The browser login contract expects HTTPS so
+the Secure refresh cookie can be stored; key rotation must retain old public
+keys until previously issued one-hour access tokens expire.
+The optional `IAM_JWT_PREVIOUS_JWKS_JSON` supplies public-only old RSA JWKs
+during that overlap. Each must have only `kty`, `kid`, `use`, `alg`, `n` and `e`;
+duplicate key IDs or private fields stop startup.
 
-## Database and Migrations
+## Verification
 
-IAM owns its data in the `iam` PostgreSQL schema. `dlc-infra-postgres` supplies the shared PostgreSQL engine, while `dlc-iam-db` owns IAM schema definitions, Liquibase changesets, and migration tooling. This repository contains the IAM API.
-
-During normal operation, the API must use an IAM-scoped runtime role through its persistence adapters. Liquibase migrations run separately with the IAM migrator role; the API does not execute them. Persistence adapters and database connectivity have not yet been implemented in this scaffold.
-
-## Requirements
-
-- Java 21
-- Maven compatible with Spring Boot 3.5.0
-
-## Build
-
-From the repository root:
-
-```bash
-mvn clean verify
-```
-
-The command above builds all three modules. Currently, no functional IAM tests have been implemented.
+From the repository root run `mvn -B verify`, or use a Java 21 Maven image with
+the repository mounted at `/workspace`. The core tests cover successful login,
+unknown users, wrong passwords, ineligible status/role/name and outbox failure.
+The HTTP tests cover the response, cookie, generic 401, unavailable database
+and public JWKS shape. Database transaction and deployed key/cookie integration
+require a PostgreSQL-backed check before promotion.
+The isolated PostgreSQL-backed results for this revision are in
+[`tests/verification-hu-iam-001.md`](tests/verification-hu-iam-001.md).
