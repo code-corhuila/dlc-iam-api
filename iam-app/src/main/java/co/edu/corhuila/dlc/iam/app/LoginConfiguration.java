@@ -2,6 +2,7 @@ package co.edu.corhuila.dlc.iam.app;
 
 import co.edu.corhuila.dlc.iam.application.port.in.LoginUseCase;
 import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenIssuer;
+import co.edu.corhuila.dlc.iam.application.port.out.LoginAttemptLimiter;
 import co.edu.corhuila.dlc.iam.application.port.out.LoginUnitOfWork;
 import co.edu.corhuila.dlc.iam.application.port.out.PasswordVerifier;
 import co.edu.corhuila.dlc.iam.application.port.out.RefreshCredential;
@@ -18,9 +19,11 @@ public class LoginConfiguration {
     }
 
     @Bean
-    LoginUseCase loginUseCase(LoginUnitOfWork unitOfWork, PasswordVerifier passwords,
+    LoginUseCase loginUseCase(LoginUnitOfWork unitOfWork, LoginAttemptLimiter limiter,
+                              PasswordVerifier passwords,
                               RefreshCredential refreshCredentials,
                               AccessTokenIssuer tokens, Clock clock) {
-        return new LoginService(unitOfWork, passwords, refreshCredentials, tokens, clock);
+        return new LoginService(unitOfWork, limiter, passwords, refreshCredentials,
+            tokens, clock);
     }
 }

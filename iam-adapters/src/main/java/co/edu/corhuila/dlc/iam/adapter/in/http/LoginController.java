@@ -2,6 +2,7 @@ package co.edu.corhuila.dlc.iam.adapter.in.http;
 
 import co.edu.corhuila.dlc.iam.adapter.out.security.RsaAccessTokenIssuer;
 import co.edu.corhuila.dlc.iam.application.port.in.LoginUseCase;
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
@@ -28,9 +29,11 @@ public final class LoginController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<Tokens> login(@RequestBody LoginBody body) {
+    public ResponseEntity<Tokens> login(@RequestBody LoginBody body,
+                                        HttpServletRequest request) {
         UUID correlationId = UUID.randomUUID();
-        var result = login.login(body.email(), body.password(), correlationId);
+        var result = login.login(body.email(), body.password(), correlationId,
+            request.getRemoteAddr());
         String refreshCookie = ResponseCookie.from("dlc_refresh", result.refreshToken())
             .httpOnly(true).secure(true).sameSite("Strict")
             .path("/api/v1/auth").maxAge(Duration.ofDays(7)).build().toString();
