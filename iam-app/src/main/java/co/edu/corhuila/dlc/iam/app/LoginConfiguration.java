@@ -2,11 +2,14 @@ package co.edu.corhuila.dlc.iam.app;
 
 import co.edu.corhuila.dlc.iam.application.port.in.LoginUseCase;
 import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenIssuer;
+import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenVerifier;
+import co.edu.corhuila.dlc.iam.application.port.out.ActorLookup;
 import co.edu.corhuila.dlc.iam.application.port.out.LoginAttemptLimiter;
 import co.edu.corhuila.dlc.iam.application.port.out.LoginUnitOfWork;
 import co.edu.corhuila.dlc.iam.application.port.out.PasswordVerifier;
 import co.edu.corhuila.dlc.iam.application.port.out.RefreshCredential;
 import co.edu.corhuila.dlc.iam.application.usecase.LoginService;
+import co.edu.corhuila.dlc.iam.application.usecase.CurrentActorService;
 import java.time.Clock;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -25,5 +28,11 @@ public class LoginConfiguration {
                               AccessTokenIssuer tokens, Clock clock) {
         return new LoginService(unitOfWork, limiter, passwords, refreshCredentials,
             tokens, clock);
+    }
+
+    @Bean
+    CurrentActorService currentActorService(AccessTokenVerifier tokens,
+                                           ActorLookup actors, Clock clock) {
+        return new CurrentActorService(tokens, actors, clock);
     }
 }
