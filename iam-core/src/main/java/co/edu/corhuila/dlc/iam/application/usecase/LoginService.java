@@ -2,6 +2,7 @@ package co.edu.corhuila.dlc.iam.application.usecase;
 
 import co.edu.corhuila.dlc.iam.application.port.in.LoginUseCase;
 import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenIssuer;
+import co.edu.corhuila.dlc.iam.application.port.out.LoginAttemptLimiter;
 import co.edu.corhuila.dlc.iam.application.port.out.LoginUnitOfWork;
 import co.edu.corhuila.dlc.iam.application.port.out.PasswordVerifier;
 import co.edu.corhuila.dlc.iam.application.port.out.RefreshCredential;
@@ -18,15 +19,18 @@ public final class LoginService implements LoginUseCase {
     private static final Duration SESSION_LIFETIME = Duration.ofDays(7);
 
     private final LoginUnitOfWork unitOfWork;
+    private final LoginAttemptLimiter limiter;
     private final PasswordVerifier passwords;
     private final RefreshCredential refreshCredentials;
     private final AccessTokenIssuer tokens;
     private final Clock clock;
 
-    public LoginService(LoginUnitOfWork unitOfWork, PasswordVerifier passwords,
+    public LoginService(LoginUnitOfWork unitOfWork, LoginAttemptLimiter limiter,
+                        PasswordVerifier passwords,
                         RefreshCredential refreshCredentials, AccessTokenIssuer tokens,
                         Clock clock) {
         this.unitOfWork = unitOfWork;
+        this.limiter = limiter;
         this.passwords = passwords;
         this.refreshCredentials = refreshCredentials;
         this.tokens = tokens;
@@ -34,8 +38,10 @@ public final class LoginService implements LoginUseCase {
     }
 
     @Override
-    public LoginResult login(String email, String password, UUID correlationId) {
-        if (email == null || password == null || correlationId == null) {
+    public LoginResult login(String email, String password, UUID correlationId,
+                             String peerIp) {
+        if (email == null || password == null || correlationId == null
+            || peerIp == null || peerIp.isBlank()) {
             throw new IllegalArgumentException("Email, password and correlation are required");
         }
         String normalizedEmail = email.strip().toLowerCase(Locale.ROOT);
@@ -45,6 +51,7 @@ public final class LoginService implements LoginUseCase {
             || password.getBytes(StandardCharsets.UTF_8).length > 72) {
             throw new IllegalArgumentException("Invalid login request");
         }
+        if (!limiter.record(peerIp)) throw new LoginRateLimitedException();
         Instant now = clock.instant();
         var result = unitOfWork.execute(store -> {
             var staff = store.findForUpdate(normalizedEmail);

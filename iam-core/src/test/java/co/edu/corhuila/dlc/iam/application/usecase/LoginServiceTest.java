@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenIssuer;
+import co.edu.corhuila.dlc.iam.application.port.out.LoginAttemptLimiter;
 import co.edu.corhuila.dlc.iam.application.port.out.LoginUnitOfWork;
 import co.edu.corhuila.dlc.iam.application.port.out.PasswordVerifier;
 import co.edu.corhuila.dlc.iam.application.port.out.RefreshCredential;
@@ -21,7 +22,8 @@ class LoginServiceTest {
     private static final UUID USER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
     private final FakeStore store = new FakeStore();
     private final FakePassword passwords = new FakePassword();
-    private final LoginService login = new LoginService(store, passwords,
+    private final FakeLimiter limiter = new FakeLimiter();
+    private final LoginService login = new LoginService(store, limiter, passwords,
         new RefreshCredential() {
             public String generate() { return "opaque-test-refresh"; }
             public String hash(String raw) { return "hashed-" + raw; }
@@ -32,7 +34,7 @@ class LoginServiceTest {
     void activeVerifiedStaffReceivesOnlyAccessTokenAndPublicStaffData() {
         store.account = staff("ACTIVE", NOW, List.of("DENTIST"), "Ada Dentist");
 
-        var result = login.login("  ADA@EXAMPLE.TEST ", "correct", UUID.randomUUID());
+        var result = login.login("  ADA@EXAMPLE.TEST ", "correct", UUID.randomUUID(), "127.0.0.1");
 
         assertEquals("ada@example.test", store.emailLookup);
         assertEquals("signed-test-access", result.accessToken());
@@ -50,8 +52,18 @@ class LoginServiceTest {
     @Test
     void unknownUserRunsDummyPasswordCheckAndReturnsGenericFailure() {
         assertThrows(InvalidLoginException.class,
-            () -> login.login("absent@example.test", "wrong", UUID.randomUUID()));
+            () -> login.login("absent@example.test", "wrong", UUID.randomUUID(), "127.0.0.1"));
         assertTrue(passwords.dummyCalled);
+        assertEquals(0, store.sessionCount);
+        assertEquals(1, limiter.attempts);
+    }
+
+    @Test
+    void blockedIpNeverStartsCredentialLookup() {
+        limiter.allowed = false;
+        assertThrows(LoginRateLimitedException.class,
+            () -> login.login("ada@example.test", "correct", UUID.randomUUID(), "127.0.0.1"));
+        assertEquals(null, store.emailLookup);
         assertEquals(0, store.sessionCount);
     }
 
@@ -70,7 +82,7 @@ class LoginServiceTest {
                 && account.name() != null && !account.roles().isEmpty()
                 && account.roles().getFirst().equals("DENTIST") ? "wrong" : "correct";
             assertThrows(InvalidLoginException.class,
-                () -> login.login("ada@example.test", password, UUID.randomUUID()));
+                () -> login.login("ada@example.test", password, UUID.randomUUID(), "127.0.0.1"));
         }
         assertEquals(0, store.sessionCount);
         assertEquals(0, store.refreshCount);
@@ -82,15 +94,15 @@ class LoginServiceTest {
         store.account = staff("ACTIVE", NOW, List.of("ADMINISTRATOR"), "Ada Admin");
         store.failOutbox = true;
         assertThrows(IllegalStateException.class,
-            () -> login.login("ada@example.test", "correct", UUID.randomUUID()));
+            () -> login.login("ada@example.test", "correct", UUID.randomUUID(), "127.0.0.1"));
     }
 
     @Test
     void malformedEmailAndOversizedBcryptInputAreRejectedBeforeStorage() {
         assertThrows(IllegalArgumentException.class,
-            () -> login.login("not-an-email", "correct", UUID.randomUUID()));
+            () -> login.login("not-an-email", "correct", UUID.randomUUID(), "127.0.0.1"));
         assertThrows(IllegalArgumentException.class,
-            () -> login.login("ada@example.test", "A".repeat(73), UUID.randomUUID()));
+            () -> login.login("ada@example.test", "A".repeat(73), UUID.randomUUID(), "127.0.0.1"));
         assertEquals(null, store.emailLookup);
     }
 
@@ -99,13 +111,13 @@ class LoginServiceTest {
         store.account = staff("ACTIVE", NOW, List.of("DENTIST"), "Ada Dentist");
         for (int attempt = 0; attempt < 3; attempt++) {
             assertThrows(InvalidLoginException.class,
-                () -> login.login("ada@example.test", "wrong", UUID.randomUUID()));
+                () -> login.login("ada@example.test", "wrong", UUID.randomUUID(), "127.0.0.1"));
         }
         assertEquals("LOCKED", store.account.status());
         assertEquals(NOW.plusSeconds(900), store.account.lockedUntil());
         assertEquals(1, store.lockEvents);
         assertThrows(InvalidLoginException.class,
-            () -> login.login("ada@example.test", "correct", UUID.randomUUID()));
+            () -> login.login("ada@example.test", "correct", UUID.randomUUID(), "127.0.0.1"));
         assertEquals(0, store.sessionCount);
     }
 
@@ -114,7 +126,7 @@ class LoginServiceTest {
         store.account = new LoginUnitOfWork.StaffAccount(USER_ID, "ada@example.test",
             "Ada Dentist", "encoded-correct", "LOCKED", NOW, 3,
             NOW.minusSeconds(1), 4, List.of("DENTIST"));
-        var result = login.login("ada@example.test", "correct", UUID.randomUUID());
+        var result = login.login("ada@example.test", "correct", UUID.randomUUID(), "127.0.0.1");
         assertEquals(1, store.unlockEvents);
         assertEquals(1, store.sessionCount);
         assertEquals(6, result.user().version());
@@ -134,6 +146,15 @@ class LoginServiceTest {
             return ("encoded-" + raw).equals(encoded);
         }
         public void dummyCheck(String raw) { dummyCalled = true; }
+    }
+
+    private static final class FakeLimiter implements LoginAttemptLimiter {
+        boolean allowed = true;
+        int attempts;
+        public boolean record(String peerIp) {
+            attempts++;
+            return allowed;
+        }
     }
 
     private static final class FakeStore implements LoginUnitOfWork, LoginUnitOfWork.Store {

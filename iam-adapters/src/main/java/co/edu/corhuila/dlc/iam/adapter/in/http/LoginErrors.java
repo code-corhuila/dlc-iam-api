@@ -1,6 +1,7 @@
 package co.edu.corhuila.dlc.iam.adapter.in.http;
 
 import co.edu.corhuila.dlc.iam.application.usecase.InvalidLoginException;
+import co.edu.corhuila.dlc.iam.application.usecase.LoginRateLimitedException;
 import java.util.Map;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
@@ -19,6 +20,14 @@ public final class LoginErrors {
             .header(HttpHeaders.CACHE_CONTROL, "no-store")
             .body(Map.of("error", "UNAUTHORIZED",
                 "message", "Authentication could not be completed."));
+    }
+
+    @ExceptionHandler(LoginRateLimitedException.class)
+    public ResponseEntity<Map<String, String>> rateLimited() {
+        return ResponseEntity.status(429)
+            .header(HttpHeaders.CACHE_CONTROL, "no-store")
+            .body(Map.of("error", "TOO_MANY_REQUESTS",
+                "message", "Too many login attempts"));
     }
 
     @ExceptionHandler({IllegalArgumentException.class, HttpMessageNotReadableException.class})

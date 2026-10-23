@@ -24,8 +24,11 @@ rows with a missing name require an owner-reviewed backfill; login rejects them
 without inventing a name.
 
 This slice adds three-failure account locking, 15-minute expiry, and
-`UserLocked`/`UserUnlocked` outbox records. HU-IAM-005 still requires the
-independent 10-attempts/IP limit and authorized administrator unlock.
+`UserLocked`/`UserUnlocked` outbox records. Auth also limits the direct peer
+address to ten login attempts in a rolling five-minute window, using a keyed
+IP digest in PostgreSQL. A gateway deployment must establish a trusted way
+to pass the original client address; untrusted `X-Forwarded-For` is ignored.
+HU-IAM-005 still requires authorized administrator unlock.
 HU-IAM-006 supplies refresh
 rotation, CSRF, logout, session inspection/revocation and current-session
 eligibility checks. Outbox delivery and consumer deduplication also require
