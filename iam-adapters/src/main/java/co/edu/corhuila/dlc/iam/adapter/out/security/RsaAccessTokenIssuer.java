@@ -1,13 +1,16 @@
 package co.edu.corhuila.dlc.iam.adapter.out.security;
 
 import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenIssuer;
+import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenVerifier;
 import co.edu.corhuila.dlc.iam.application.port.out.LoginUnitOfWork;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.math.BigInteger;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyFactory;
+import java.security.GeneralSecurityException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
@@ -25,7 +28,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 @Component
-public final class RsaAccessTokenIssuer implements AccessTokenIssuer {
+public final class RsaAccessTokenIssuer implements AccessTokenIssuer, AccessTokenVerifier {
     private final PrivateKey privateKey;
     private final RSAPublicKey publicKey;
     private final String kid;
@@ -96,6 +99,56 @@ public final class RsaAccessTokenIssuer implements AccessTokenIssuer {
 
     public List<Map<String, Object>> publicJwks() {
         return jwks;
+    }
+
+    @Override
+    public VerifiedAccessToken verify(String token, Instant now) {
+        if (token == null || token.length() > 8192 || now == null) {
+            throw new IllegalArgumentException("Invalid access token");
+        }
+        try {
+            String[] parts = token.split("\\.", -1);
+            if (parts.length != 3) throw new IllegalArgumentException();
+            JsonNode header = json.readTree(Base64.getUrlDecoder().decode(parts[0]));
+            if (!"RS256".equals(header.path("alg").asText())
+                || !"JWT".equals(header.path("typ").asText())) {
+                throw new IllegalArgumentException();
+            }
+            String tokenKid = header.path("kid").asText();
+            Map<String, Object> jwk = jwks.stream()
+                .filter(key -> tokenKid.equals(key.get("kid"))).findFirst()
+                .orElseThrow(IllegalArgumentException::new);
+            RSAPublicKey key = verificationKey(jwk);
+            Signature signature = Signature.getInstance("SHA256withRSA");
+            signature.initVerify(key);
+            signature.update((parts[0] + "." + parts[1]).getBytes(StandardCharsets.US_ASCII));
+            if (!signature.verify(Base64.getUrlDecoder().decode(parts[2]))) {
+                throw new IllegalArgumentException();
+            }
+            JsonNode claims = json.readTree(Base64.getUrlDecoder().decode(parts[1]));
+            JsonNode issued = claims.path("iat");
+            JsonNode expiry = claims.path("exp");
+            if (!issuer.equals(claims.path("iss").asText())
+                || !audience.equals(claims.path("aud").asText())
+                || !issued.isIntegralNumber() || !expiry.isIntegralNumber()
+                || issued.asLong() > now.getEpochSecond()
+                || expiry.asLong() <= now.getEpochSecond()
+                || expiry.asLong() > issued.asLong() + 3600) {
+                throw new IllegalArgumentException();
+            }
+            return new VerifiedAccessToken(UUID.fromString(claims.path("sub").asText()),
+                UUID.fromString(claims.path("sid").asText()));
+        } catch (Exception rejected) {
+            throw new IllegalArgumentException("Invalid access token");
+        }
+    }
+
+    private static RSAPublicKey verificationKey(Map<String, Object> jwk)
+        throws GeneralSecurityException {
+        return (RSAPublicKey) KeyFactory.getInstance("RSA").generatePublic(
+            new RSAPublicKeySpec(
+                new BigInteger(1, Base64.getUrlDecoder().decode((String) jwk.get("n"))),
+                new BigInteger(1, Base64.getUrlDecoder().decode((String) jwk.get("e")))));
     }
 
     private List<Map<String, Object>> loadVerificationKeys(String previousJson) {
