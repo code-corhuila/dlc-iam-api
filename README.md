@@ -2,7 +2,7 @@
 
 DLC Identity and Access Management microservice, developed with Java 21 and Spring Boot 3.5.0.
 
-**Current status:** project skeleton. IAM use cases, endpoints, and persistence adapters have not yet been implemented.
+**Current status:** IAM use cases and adapters are being delivered incrementally; see each PR for validation evidence.
 
 ## Project Structure
 
@@ -46,6 +46,8 @@ dlc-iam-api/
 ├── pom.xml
 └── README.md
 ```
+
+The account-lock slice records three consecutive failed passwords, locks for 15 minutes, and writes `UserLocked`/`UserUnlocked` to the owner outbox. HU-IAM-005 also requires the independent IP limit and authorized administrator unlock. Session rotation and revocation remain HU-IAM-006 work.
 
 ### Responsibility of Each Module
 
