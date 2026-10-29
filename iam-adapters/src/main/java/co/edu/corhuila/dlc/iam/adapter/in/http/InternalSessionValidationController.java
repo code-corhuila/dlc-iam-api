@@ -66,7 +66,7 @@ public class InternalSessionValidationController {
             boolean active = sessions.active(UUID.fromString(staff.getSubject()),
                 UUID.fromString(staff.getClaimAsString("sid")), list.stream().map(String.class::cast).toList());
             return ResponseEntity.ok(Map.of("active", active));
-        } catch (JwtException | IllegalArgumentException invalid) {
+        } catch (JwtException | IllegalArgumentException | ClassCastException invalid) {
             return ResponseEntity.ok(Map.of("active", false));
         } catch (DataAccessException unavailable) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
