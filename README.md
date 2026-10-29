@@ -2,7 +2,7 @@
 
 DLC Identity and Access Management microservice, developed with Java 21 and Spring Boot 3.5.0.
 
-**Current status:** IAM use cases and adapters are being delivered incrementally; see each PR for validation evidence.
+**Current status:** IAM use cases and adapters are being delivered incrementally. See each PR for its implemented scope and validation evidence.
 
 ## Project Structure
 
