@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import co.edu.corhuila.dlc.iam.adapter.out.security.RsaAccessTokenIssuer;
+import co.edu.corhuila.dlc.iam.application.port.out.LoginUnitOfWork;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -13,10 +14,38 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import org.springframework.security.oauth2.jwt.JwtException;
 
 class RsaAccessTokenIssuerTest {
     private final ObjectMapper json = new ObjectMapper();
+
+    @Test
+    void sessionDecoderVerifiesClaimsSignatureAndPreviousKey() throws Exception {
+        KeyPair oldPair = newKeyPair();
+        KeyPair currentPair = newKeyPair();
+        var oldSigner = new RsaAccessTokenIssuer(
+            pem("PRIVATE KEY", oldPair.getPrivate().getEncoded()),
+            pem("PUBLIC KEY", oldPair.getPublic().getEncoded()),
+            "old", "https://auth.test.invalid", "owner-apis", "[]", json);
+        String previous = json.writeValueAsString(oldSigner.publicJwks());
+        var currentSigner = new RsaAccessTokenIssuer(
+            pem("PRIVATE KEY", currentPair.getPrivate().getEncoded()),
+            pem("PUBLIC KEY", currentPair.getPublic().getEncoded()),
+            "current", "https://auth.test.invalid", "owner-apis", previous, json);
+        var account = new LoginUnitOfWork.StaffAccount(UUID.randomUUID(), "staff@example.test",
+            "Staff", "unused", "ACTIVE", Instant.now(), 0, List.of("DENTIST"));
+        Instant now = Instant.now();
+        String token = oldSigner.issue(account, UUID.randomUUID(), now, now.plusSeconds(3600));
+        var config = new SessionValidationConfiguration();
+        var decoder = config.staffJwtDecoder(currentSigner, "https://auth.test.invalid", "owner-apis");
+        assertEquals(account.id().toString(), decoder.decode(token).getSubject());
+        var wrongAudience = config.staffJwtDecoder(currentSigner, "https://auth.test.invalid", "other-api");
+        assertThrows(JwtException.class, () -> wrongAudience.decode(token));
+        assertThrows(JwtException.class, () -> decoder.decode(token + "tampered"));
+    }
 
     @Test
     void rolloverPublishesCurrentAndPreviousPublicKeysOnly() throws Exception {
