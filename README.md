@@ -49,8 +49,8 @@ dlc-iam-api/
 
 ### Responsibility of Each Module
 
-- **`iam-core`**: contains the domain, use cases, and input (`in`) and output (`out`) ports. Currently, it only defines the base packages.
-- **`iam-adapters`**: contains the HTTP entry points and output adapters for persistence. Currently, it only defines the base packages and depends on `iam-core`.
+- **`iam-core`**: contains the domain, use cases, and input (`in`) and output (`out`) ports.
+- **`iam-adapters`**: contains HTTP entry points, security, and IAM persistence adapters; it depends on `iam-core`.
 - **`iam-app`**: contains `IamApplication`, the initial Spring Boot configuration, and the dependencies required to assemble the modules.
 
 The `package-info.java` files preserve the Java packages within the project skeleton. The `.gitkeep` files allow empty test and deployment directories to be tracked by Git.
@@ -80,4 +80,4 @@ From the repository root:
 mvn clean verify
 ```
 
-The command above builds all three modules. Currently, no functional IAM tests have been implemented.
+The command above builds all three modules and runs the current IAM unit tests.
