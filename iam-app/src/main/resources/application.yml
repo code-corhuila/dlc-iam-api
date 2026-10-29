@@ -1,3 +1,7 @@
 spring:
   application:
     name: dlc-iam-api
+  datasource:
+    url: ${IAM_DATABASE_URL}
+    username: ${IAM_DATABASE_USER}
+    password: ${IAM_DATABASE_PASSWORD}

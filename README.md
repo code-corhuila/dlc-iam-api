@@ -2,7 +2,7 @@
 
 DLC Identity and Access Management microservice, developed with Java 21 and Spring Boot 3.5.0.
 
-**Current status:** project skeleton. IAM use cases, endpoints, and persistence adapters have not yet been implemented.
+**Current status:** IAM use cases and adapters are being delivered incrementally. See each PR for its implemented scope and validation evidence.
 
 ## Project Structure
 
@@ -59,7 +59,13 @@ The `package-info.java` files preserve the Java packages within the project skel
 
 IAM owns its data in the `iam` PostgreSQL schema. `dlc-infra-postgres` supplies the shared PostgreSQL engine, while `dlc-iam-db` owns IAM schema definitions, Liquibase changesets, and migration tooling. This repository contains the IAM API.
 
-During normal operation, the API must use an IAM-scoped runtime role through its persistence adapters. Liquibase migrations run separately with the IAM migrator role; the API does not execute them. Persistence adapters and database connectivity have not yet been implemented in this scaffold.
+During normal operation, the API uses an IAM-scoped runtime role through its persistence adapters. Liquibase migrations run separately with the IAM migrator role; the API does not execute them. Set `IAM_DATABASE_URL`, `IAM_DATABASE_USER`, and `IAM_DATABASE_PASSWORD` in the environment.
+
+## Internal session validation
+
+`POST /internal/v1/sessions/validations` accepts `{ "accessToken": "..." }` and returns only `{ "active": true|false }`. Callers present a separate signed service JWT with the `identity:validate` scope. Set its trusted JWKS, issuer, and audience with `IAM_INTERNAL_SERVICE_JWKS_URI`, `IAM_INTERNAL_SERVICE_ISSUER`, and `IAM_INTERNAL_SERVICE_AUDIENCE`. Keep this route off the public Gateway.
+
+IAM checks the staff JWT signature, issuer, audience, expiry, session revocation, account state, inactivity deadline, and current roles. Invalid staff tokens return `active: false`; a database outage returns 503 so callers can fail closed. Token bodies are not logged.
 
 ## Requirements
 
