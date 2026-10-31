@@ -47,6 +47,8 @@ dlc-iam-api/
 └── README.md
 ```
 
+The account-lock slice records three consecutive failed passwords, locks for 15 minutes, and writes `UserLocked`/`UserUnlocked` to the owner outbox. HU-IAM-005 also requires the independent IP limit and authorized administrator unlock. Session rotation and revocation remain HU-IAM-006 work.
+
 ### Responsibility of Each Module
 
 - **`iam-core`**: contains the domain, use cases, and input (`in`) and output (`out`) ports.

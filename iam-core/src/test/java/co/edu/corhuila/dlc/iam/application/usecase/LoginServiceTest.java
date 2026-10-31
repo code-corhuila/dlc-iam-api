@@ -94,10 +94,38 @@ class LoginServiceTest {
         assertEquals(null, store.emailLookup);
     }
 
+    @Test
+    void thirdWrongPasswordLocksAccountAndLaterCorrectPasswordStillFails() {
+        store.account = staff("ACTIVE", NOW, List.of("DENTIST"), "Ada Dentist");
+        for (int attempt = 0; attempt < 3; attempt++) {
+            assertThrows(InvalidLoginException.class,
+                () -> login.login("ada@example.test", "wrong", UUID.randomUUID()));
+        }
+        assertEquals("LOCKED", store.account.status());
+        assertEquals(NOW.plusSeconds(900), store.account.lockedUntil());
+        assertEquals(1, store.lockEvents);
+        assertThrows(InvalidLoginException.class,
+            () -> login.login("ada@example.test", "correct", UUID.randomUUID()));
+        assertEquals(0, store.sessionCount);
+    }
+
+    @Test
+    void expiredLockIsAuditedAndEligibleStaffCanSignIn() {
+        store.account = new LoginUnitOfWork.StaffAccount(USER_ID, "ada@example.test",
+            "Ada Dentist", "encoded-correct", "LOCKED", NOW, 3,
+            NOW.minusSeconds(1), 4, List.of("DENTIST"));
+        var result = login.login("ada@example.test", "correct", UUID.randomUUID());
+        assertEquals(1, store.unlockEvents);
+        assertEquals(1, store.sessionCount);
+        assertEquals(6, result.user().version());
+    }
+
     private static LoginUnitOfWork.StaffAccount staff(String status, Instant verified,
                                                        List<String> roles, String name) {
         return new LoginUnitOfWork.StaffAccount(USER_ID, "ada@example.test", name,
-            "encoded-correct", status, verified, 4, roles);
+            "encoded-correct", status, verified,
+            "LOCKED".equals(status) ? 3 : 0,
+            "LOCKED".equals(status) ? NOW.plusSeconds(900) : null, 4, roles);
     }
 
     private static final class FakePassword implements PasswordVerifier {
@@ -117,11 +145,29 @@ class LoginServiceTest {
         int sessionCount;
         int refreshCount;
         int outboxCount;
+        int lockEvents;
+        int unlockEvents;
         boolean failOutbox;
 
         public <T> T execute(Function<Store, T> operation) { return operation.apply(this); }
         public StaffAccount findForUpdate(String email) {
             emailLookup = email;
+            return account;
+        }
+        public void recordFailedPassword(StaffAccount staff, Instant at, UUID correlationId) {
+            int failures = staff.failedAttempts() + 1;
+            boolean locked = failures == 3;
+            account = new StaffAccount(staff.id(), staff.email(), staff.name(),
+                staff.passwordHash(), locked ? "LOCKED" : staff.status(),
+                staff.verifiedAt(), failures, locked ? at.plusSeconds(900) : null,
+                staff.version() + 1, staff.roles());
+            if (locked) lockEvents++;
+        }
+        public StaffAccount unlockExpired(StaffAccount staff, Instant at, UUID correlationId) {
+            unlockEvents++;
+            account = new StaffAccount(staff.id(), staff.email(), staff.name(),
+                staff.passwordHash(), "ACTIVE", staff.verifiedAt(), 0, null,
+                staff.version() + 1, staff.roles());
             return account;
         }
         public void resetFailures(UUID userId, Instant at) { resetCount++; }
