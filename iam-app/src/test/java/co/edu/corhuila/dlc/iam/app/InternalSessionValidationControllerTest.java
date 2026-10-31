@@ -1,11 +1,11 @@
 package co.edu.corhuila.dlc.iam.app;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import co.edu.corhuila.dlc.iam.adapter.in.http.InternalSessionValidationController;
+import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenVerifier;
 import co.edu.corhuila.dlc.iam.application.port.out.SessionSnapshotReader;
 import co.edu.corhuila.dlc.iam.application.usecase.ValidateSessionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -19,7 +19,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
-import org.springframework.security.oauth2.jwt.JwtException;
 
 class InternalSessionValidationControllerTest {
     private static final Instant NOW = Instant.parse("2026-10-29T12:00:00Z");
@@ -30,12 +29,11 @@ class InternalSessionValidationControllerTest {
     @Test
     void checksServiceScopeAndCurrentOwnerState() throws Exception {
         var service = mock(JwtDecoder.class);
-        var staff = mock(JwtDecoder.class);
+        var staff = mock(AccessTokenVerifier.class);
         when(service.decode("caller")).thenReturn(jwt("caller", Map.of("scope", "identity:validate")));
         when(service.decode("without-scope")).thenReturn(jwt("without-scope", Map.of("scope", "other:read")));
-        when(staff.decode("staff")).thenReturn(jwt("staff", Map.of(
-            "sub", USER.toString(), "sid", SESSION.toString(), "roles", List.of("DENTIST"),
-            "permissions", List.of(), "jti", "token-1")));
+        when(staff.verify("staff")).thenReturn(new AccessTokenVerifier.VerifiedAccessToken(
+            USER, SESSION, List.of("DENTIST")));
         var eligible = snapshot(null, List.of("DENTIST"));
         var controller = controller(service, staff, (user, session) -> eligible);
         var body = json.readTree("{\"accessToken\":\"staff\"}");
@@ -55,12 +53,11 @@ class InternalSessionValidationControllerTest {
     @Test
     void invalidStaffTokenIsInactiveAndDatabaseFailureIsUnavailable() throws Exception {
         var service = mock(JwtDecoder.class);
-        var staff = mock(JwtDecoder.class);
+        var staff = mock(AccessTokenVerifier.class);
         when(service.decode("caller")).thenReturn(jwt("caller", Map.of("scope", "identity:validate")));
-        when(staff.decode("bad")).thenThrow(new JwtException("invalid"));
-        when(staff.decode("staff")).thenReturn(jwt("staff", Map.of(
-            "sub", USER.toString(), "sid", SESSION.toString(), "roles", List.of("DENTIST"),
-            "permissions", List.of(), "jti", "token-1")));
+        when(staff.verify("bad")).thenThrow(new IllegalArgumentException("invalid"));
+        when(staff.verify("staff")).thenReturn(new AccessTokenVerifier.VerifiedAccessToken(
+            USER, SESSION, List.of("DENTIST")));
         var reader = (SessionSnapshotReader) (user, session) -> {
             throw new DataAccessResourceFailureException("unavailable");
         };
@@ -71,7 +68,7 @@ class InternalSessionValidationControllerTest {
             json.readTree("{\"accessToken\":\"staff\"}")).getStatusCode().value());
     }
 
-    private InternalSessionValidationController controller(JwtDecoder service, JwtDecoder staff,
+    private InternalSessionValidationController controller(JwtDecoder service, AccessTokenVerifier staff,
                                                             SessionSnapshotReader reader) {
         return new InternalSessionValidationController(service, staff,
             new ValidateSessionService(reader, Clock.fixed(NOW, ZoneOffset.UTC)));
