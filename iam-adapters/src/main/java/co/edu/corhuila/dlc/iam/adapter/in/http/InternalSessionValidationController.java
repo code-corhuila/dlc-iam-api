@@ -1,10 +1,10 @@
 package co.edu.corhuila.dlc.iam.adapter.in.http;
 
+import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenVerifier;
 import co.edu.corhuila.dlc.iam.application.usecase.ValidateSessionService;
 import com.fasterxml.jackson.databind.JsonNode;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpHeaders;
@@ -21,11 +21,11 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 public class InternalSessionValidationController {
     private final JwtDecoder serviceTokens;
-    private final JwtDecoder staffTokens;
+    private final AccessTokenVerifier staffTokens;
     private final ValidateSessionService sessions;
 
     public InternalSessionValidationController(@Qualifier("serviceJwtDecoder") JwtDecoder serviceTokens,
-                                               @Qualifier("staffJwtDecoder") JwtDecoder staffTokens,
+                                               AccessTokenVerifier staffTokens,
                                                ValidateSessionService sessions) {
         this.serviceTokens = serviceTokens;
         this.staffTokens = staffTokens;
@@ -55,18 +55,10 @@ public class InternalSessionValidationController {
             return ResponseEntity.badRequest().build();
         }
         try {
-            Jwt staff = staffTokens.decode(body.get("accessToken").asText());
-            Object roles = staff.getClaims().get("roles");
-            if (!(roles instanceof List<?> list) || list.stream().anyMatch(role -> !(role instanceof String))
-                || staff.getId() == null || staff.getSubject() == null
-                || staff.getClaimAsString("sid") == null
-                || staff.getClaims().get("permissions") == null) {
-                return ResponseEntity.ok(Map.of("active", false));
-            }
-            boolean active = sessions.active(UUID.fromString(staff.getSubject()),
-                UUID.fromString(staff.getClaimAsString("sid")), list.stream().map(String.class::cast).toList());
+            var staff = staffTokens.verify(body.get("accessToken").asText());
+            boolean active = sessions.active(staff.userId(), staff.sessionId(), staff.roles());
             return ResponseEntity.ok(Map.of("active", active));
-        } catch (JwtException | IllegalArgumentException | ClassCastException invalid) {
+        } catch (IllegalArgumentException invalid) {
             return ResponseEntity.ok(Map.of("active", false));
         } catch (DataAccessException unavailable) {
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).build();
