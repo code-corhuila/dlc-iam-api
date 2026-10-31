@@ -1,6 +1,8 @@
 package co.edu.corhuila.dlc.iam.app;
 
 import co.edu.corhuila.dlc.iam.application.port.out.SessionSnapshotReader;
+import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenVerifier;
+import co.edu.corhuila.dlc.iam.application.usecase.CurrentActorService;
 import co.edu.corhuila.dlc.iam.application.usecase.ValidateSessionService;
 import co.edu.corhuila.dlc.iam.adapter.out.security.RsaAccessTokenIssuer;
 import com.nimbusds.jose.JWSAlgorithm;
@@ -32,6 +34,12 @@ public class SessionValidationConfiguration {
     @Bean
     ValidateSessionService validateSessionService(SessionSnapshotReader reader, Clock iamClock) {
         return new ValidateSessionService(reader, iamClock);
+    }
+
+    @Bean
+    CurrentActorService currentActorService(AccessTokenVerifier tokens,
+                                            ValidateSessionService sessions) {
+        return new CurrentActorService(tokens, sessions);
     }
 
     @Bean("staffJwtDecoder")
