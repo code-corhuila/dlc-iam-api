@@ -46,18 +46,25 @@ public final class LoginService implements LoginUseCase {
             throw new IllegalArgumentException("Invalid login request");
         }
         Instant now = clock.instant();
-        return unitOfWork.execute(store -> {
+        var result = unitOfWork.execute(store -> {
             var staff = store.findForUpdate(normalizedEmail);
             if (staff == null) {
                 passwords.dummyCheck(password);
-                throw new InvalidLoginException();
+                return null;
+            }
+            if ("LOCKED".equals(staff.status()) && staff.lockedUntil() != null
+                && !staff.lockedUntil().isAfter(now)) {
+                staff = store.unlockExpired(staff, now, correlationId);
             }
             boolean validPassword = passwords.matches(password, staff.passwordHash());
+            if (!validPassword && "ACTIVE".equals(staff.status())) {
+                store.recordFailedPassword(staff, now, correlationId);
+            }
             if (!validPassword || !"ACTIVE".equals(staff.status())
                 || staff.verifiedAt() == null || staff.roles() == null
                 || staff.roles().isEmpty() || !approvedRoles(staff)
                 || staff.name() == null || staff.name().isBlank()) {
-                throw new InvalidLoginException();
+                return null;
             }
 
             // The row lock and every write below are in one database transaction.
@@ -78,6 +85,8 @@ public final class LoginService implements LoginUseCase {
                 List.copyOf(staff.roles()), staff.status(), staff.version() + 1);
             return new LoginResult(access, refresh, user);
         });
+        if (result == null) throw new InvalidLoginException();
+        return result;
     }
 
     private boolean approvedRoles(LoginUnitOfWork.StaffAccount staff) {

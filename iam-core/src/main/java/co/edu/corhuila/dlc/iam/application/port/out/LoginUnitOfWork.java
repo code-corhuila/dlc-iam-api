@@ -10,6 +10,8 @@ public interface LoginUnitOfWork {
 
     interface Store {
         StaffAccount findForUpdate(String normalizedEmail);
+        void recordFailedPassword(StaffAccount staff, Instant at, UUID correlationId);
+        StaffAccount unlockExpired(StaffAccount staff, Instant at, UUID correlationId);
         void resetFailures(UUID userId, Instant at);
         void createSession(UUID sessionId, UUID userId, String deviceId,
                            Instant at, Instant inactiveAt);
@@ -21,6 +23,7 @@ public interface LoginUnitOfWork {
     }
 
     record StaffAccount(UUID id, String email, String name, String passwordHash,
-                        String status, Instant verifiedAt, long version,
+                        String status, Instant verifiedAt, int failedAttempts,
+                        Instant lockedUntil, long version,
                         List<String> roles) { }
 }
