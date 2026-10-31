@@ -36,7 +36,7 @@ class RsaAccessTokenIssuerTest {
             pem("PUBLIC KEY", currentPair.getPublic().getEncoded()),
             "current", "https://auth.test.invalid", "owner-apis", previous, json);
         var account = new LoginUnitOfWork.StaffAccount(UUID.randomUUID(), "staff@example.test",
-            "Staff", "unused", "ACTIVE", Instant.now(), 0, List.of("DENTIST"));
+            "Staff", "unused", "ACTIVE", Instant.now(), 0, null, 0, List.of("DENTIST"));
         Instant now = Instant.now();
         String token = oldSigner.issue(account, UUID.randomUUID(), now, now.plusSeconds(3600));
         var config = new SessionValidationConfiguration();
