@@ -45,6 +45,8 @@ class RevokeOwnSessionServiceTest {
     @Test
     void foreignOrMissingSessionIsNotRevealed() {
         store.owned = false;
+        store.attempt = new OwnSessionRevocationUnitOfWork.Attempt(
+            SESSION, OWNER, "User request");
         assertThrows(NoSuchElementException.class,
             () -> service.revoke(OWNER, SESSION, KEY, "User request", CORRELATION));
         assertEquals(0, store.revocations);
