@@ -63,6 +63,10 @@ IAM owns its data in the `iam` PostgreSQL schema. `dlc-infra-postgres` supplies 
 
 During normal operation, the API uses an IAM-scoped runtime role through its persistence adapters. Liquibase migrations run separately with the IAM migrator role; the API does not execute them. Set `IAM_DATABASE_URL`, `IAM_DATABASE_USER`, and `IAM_DATABASE_PASSWORD` in the environment.
 
+## Login transport configuration
+
+Set `IAM_AUTH_ALLOWED_ORIGIN` to the exact portal origin and `IAM_LOGIN_IP_DIGEST_KEY_BASE64` to a secret Base64-encoded key of at least 32 random bytes. The login endpoint fails startup without either value. It uses the direct connection peer for its per-IP window; forwarded address headers are ignored until a trusted proxy policy is implemented. Provision the IAM DB display-name, IP-attempt, and expired-lock-audit migrations before deploying this endpoint.
+
 ## Internal session validation
 
 `POST /internal/v1/sessions/validations` accepts `{ "accessToken": "..." }` and returns only `{ "active": true|false }`. Callers present a separate signed service JWT with the `identity:validate` scope. Set its trusted JWKS, issuer, and audience with `IAM_INTERNAL_SERVICE_JWKS_URI`, `IAM_INTERNAL_SERVICE_ISSUER`, and `IAM_INTERNAL_SERVICE_AUDIENCE`. Keep this route off the public Gateway.
