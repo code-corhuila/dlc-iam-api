@@ -30,16 +30,16 @@ public final class UnlockAccountService implements UnlockAccount {
             }
             var previous = store.findAttempt(idempotencyKey);
             if (previous != null) {
-                if (!previous.actorId().equals(actorId) || !previous.userId().equals(userId)
-                    || previous.expectedVersion() != expectedVersion
-                    || !previous.reason().equals(reason)) {
-                    throw new ConcurrentModificationException("Idempotency key reused");
-                }
-                return new Result(userId, "ACTIVE", previous.resultVersion());
+                return replay(previous, actorId, userId, expectedVersion, reason);
             }
             var account = store.findForUpdate(userId);
             if (account == null) {
                 throw new NoSuchElementException("Staff not found");
+            }
+            // A concurrent request with the same key may have committed while row locking waited.
+            previous = store.findAttempt(idempotencyKey);
+            if (previous != null) {
+                return replay(previous, actorId, userId, expectedVersion, reason);
             }
             if (account.version() != expectedVersion || !"LOCKED".equals(account.status())
                 || !account.verified()) {
@@ -52,5 +52,15 @@ public final class UnlockAccountService implements UnlockAccount {
             store.appendUserUnlocked(userId, actorId, idempotencyKey, correlationId, now);
             return new Result(userId, "ACTIVE", expectedVersion + 1);
         });
+    }
+
+    private static Result replay(UnlockAccountUnitOfWork.Attempt previous, UUID actorId,
+                                 UUID userId, long expectedVersion, String reason) {
+        if (!previous.actorId().equals(actorId) || !previous.userId().equals(userId)
+            || previous.expectedVersion() != expectedVersion
+            || !previous.reason().equals(reason)) {
+            throw new ConcurrentModificationException("Idempotency key reused");
+        }
+        return new Result(userId, "ACTIVE", previous.resultVersion());
     }
 }
