@@ -49,6 +49,17 @@ class UnlockAccountServiceTest {
     }
 
     @Test
+    void retryThatCommitsWhileWaitingForTargetLockReturnsOriginalResult() {
+        store.lateAttempt = new UnlockAccountUnitOfWork.Attempt(admin, staff,
+            "Administrator reviewed lock", 4, 5);
+        store.account = new UnlockAccountUnitOfWork.Account(staff, "ACTIVE", true, 5);
+        var result = service.unlock(admin, staff, 4, "Administrator reviewed lock", key, correlation);
+        assertEquals(5, result.version());
+        assertEquals(0, store.stateWrites);
+        assertEquals(0, store.audits);
+    }
+
+    @Test
     void rejectsKeyReuseForDifferentRequest() {
         store.attempt = new UnlockAccountUnitOfWork.Attempt(admin, staff, "Original", 4, 5);
         assertThrows(ConcurrentModificationException.class,
@@ -105,6 +116,8 @@ class UnlockAccountServiceTest {
                                                   UnlockAccountUnitOfWork.Store {
         Account account = new Account(staff, "LOCKED", true, 4);
         Attempt attempt;
+        Attempt lateAttempt;
+        int attemptReads;
         boolean admin = true;
         boolean failEvent;
         int executions;
@@ -129,7 +142,10 @@ class UnlockAccountServiceTest {
             }
         }
         @Override public boolean activeAdministratorForUpdate(UUID actorId) { return admin; }
-        @Override public Attempt findAttempt(UUID idempotencyKey) { return attempt; }
+        @Override public Attempt findAttempt(UUID idempotencyKey) {
+            attemptReads++;
+            return attemptReads == 2 && lateAttempt != null ? lateAttempt : attempt;
+        }
         @Override public Account findForUpdate(UUID userId) { return account; }
         @Override public void unlock(UUID userId, long version, Instant at) { stateWrites++; }
         @Override public void appendAudit(UUID userId, UUID actorId, String reason,
