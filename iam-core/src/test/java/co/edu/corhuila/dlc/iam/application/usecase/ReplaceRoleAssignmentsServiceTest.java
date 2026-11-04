@@ -126,7 +126,8 @@ class ReplaceRoleAssignmentsServiceTest {
         }
         public boolean activeAdministratorForUpdate(UUID actorId) { return administrator; }
         public StaffAccount findForUpdate(UUID userId) { return account; }
-        public void replaceRoles(UUID userId, List<String> roles, long expectedVersion) {
+        public void replaceRoles(UUID userId, List<String> roles, long expectedVersion,
+                                 UUID actorId, Instant at) {
             replacements++;
         }
         public void appendAudit(UUID userId, String role, String action, UUID actorId,
