@@ -39,11 +39,16 @@ public final class JdbcStaffNameUnitOfWork implements StaffNameUnitOfWork {
         @Override
         public Staff findForUpdate(UUID userId) {
             var rows = jdbc.query("""
-                SELECT user_id, display_name, status, version FROM iam.users
+                SELECT user_id, email, display_name, status, created_at, updated_at, version
+                  FROM iam.users
                  WHERE user_id = ? FOR UPDATE
                 """, (rs, row) -> new Staff(rs.getObject("user_id", UUID.class),
-                    rs.getString("display_name"), rs.getString("status"),
-                    rs.getLong("version")), userId);
+                    rs.getString("email"), rs.getString("display_name"),
+                    jdbc.queryForList("""
+                        SELECT role FROM iam.user_roles WHERE user_id = ? ORDER BY role
+                        """, String.class, userId), rs.getString("status"),
+                    rs.getTimestamp("created_at").toInstant(),
+                    rs.getTimestamp("updated_at").toInstant(), rs.getLong("version")), userId);
             return rows.isEmpty() ? null : rows.getFirst();
         }
 

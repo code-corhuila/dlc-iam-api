@@ -1,6 +1,7 @@
 package co.edu.corhuila.dlc.iam.app;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import co.edu.corhuila.dlc.iam.adapter.out.persistence.JdbcStaffNameUnitOfWork;
@@ -43,11 +44,20 @@ class StaffNameJdbcIT {
             INSERT INTO iam.user_roles (user_id,role,assigned_at)
             VALUES (?,'ADMINISTRATOR',?)
             """, admin, Timestamp.from(created));
+        jdbc.update("""
+            INSERT INTO iam.user_roles (user_id,role,assigned_at)
+            VALUES (?,'DENTIST',?)
+            """, staff, Timestamp.from(created));
         var correlation = UUID.randomUUID();
         assertThrows(SecurityException.class,
             () -> service.update(other, staff, "Ada Staff", 1, correlation));
         var updated = service.update(admin, staff, "Ada Staff", 1, correlation);
         assertEquals(2, updated.version());
+        assertEquals(staff + "@example.test", updated.email());
+        assertEquals("ACTIVE", updated.status());
+        assertEquals(java.util.List.of("DENTIST"), updated.roles());
+        assertNotNull(updated.createdAt());
+        assertNotNull(updated.updatedAt());
         assertEquals("Ada Staff", jdbc.queryForObject(
             "SELECT display_name FROM iam.users WHERE user_id = ?", String.class, staff));
         assertEquals(1, jdbc.queryForObject("""

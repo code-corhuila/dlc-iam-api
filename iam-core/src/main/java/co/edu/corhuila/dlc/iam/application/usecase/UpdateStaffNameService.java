@@ -34,14 +34,22 @@ public final class UpdateStaffNameService {
                 throw new ConcurrentModificationException("Staff version changed");
             }
             if (name.equals(staff.name())) {
-                return new Result(staff.id(), name, staff.version());
+                return view(staff, name, staff.updatedAt(), staff.version());
             }
             var now = clock.instant();
             store.updateName(userId, name, expectedVersion, now);
             store.appendAudit(userId, actorId, staff.status(), correlationId, now);
-            return new Result(staff.id(), name, expectedVersion + 1);
+            return view(staff, name, now, expectedVersion + 1);
         });
     }
 
-    public record Result(UUID id, String name, long version) { }
+    private static Result view(StaffNameUnitOfWork.Staff staff, String name,
+                               java.time.Instant updatedAt, long version) {
+        return new Result(staff.id(), staff.email(), name, staff.roles(), staff.status(),
+            staff.createdAt(), updatedAt, version);
+    }
+
+    public record Result(UUID id, String email, String name, java.util.List<String> roles,
+                         String status, java.time.Instant createdAt,
+                         java.time.Instant updatedAt, long version) { }
 }

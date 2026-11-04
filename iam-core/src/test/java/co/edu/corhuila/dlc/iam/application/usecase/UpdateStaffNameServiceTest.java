@@ -9,6 +9,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ConcurrentModificationException;
 import java.util.NoSuchElementException;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 import org.junit.jupiter.api.Test;
@@ -57,7 +58,7 @@ class UpdateStaffNameServiceTest {
         store.account = null;
         assertThrows(NoSuchElementException.class,
             () -> service.update(actor, staff, "New Name", 1, correlation));
-        store.account = new StaffNameUnitOfWork.Staff(staff, "Ada Staff", "ACTIVE", 2);
+        store.account = account(2);
         assertThrows(ConcurrentModificationException.class,
             () -> service.update(actor, staff, "New Name", 1, correlation));
         assertEquals(0, store.writes);
@@ -65,7 +66,7 @@ class UpdateStaffNameServiceTest {
     }
 
     private final class FakeStore implements StaffNameUnitOfWork, StaffNameUnitOfWork.Store {
-        Staff account = new Staff(staff, "Ada Staff", "ACTIVE", 1);
+        Staff account = account(1);
         boolean admin = true;
         int executions;
         int writes;
@@ -88,5 +89,11 @@ class UpdateStaffNameServiceTest {
             audits++;
             correlation = correlationId;
         }
+    }
+
+    private StaffNameUnitOfWork.Staff account(long version) {
+        return new StaffNameUnitOfWork.Staff(staff, "ada@example.test", "Ada Staff",
+            List.of("DENTIST"), "ACTIVE", Instant.parse("2026-11-01T12:00:00Z"),
+            Instant.parse("2026-11-01T12:00:00Z"), version);
     }
 }
