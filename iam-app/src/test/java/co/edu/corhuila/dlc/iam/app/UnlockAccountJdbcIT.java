@@ -40,8 +40,8 @@ class UnlockAccountJdbcIT {
         for (UUID id : new UUID[] {admin, staff, outsider}) {
             jdbc.update("""
                 INSERT INTO iam.users
-                  (user_id,email,password_hash,status,email_verified_at,created_at,updated_at,version)
-                VALUES (?,?,'test-hash','ACTIVE',?,?,?,4)
+                  (user_id,email,display_name,password_hash,status,email_verified_at,created_at,updated_at,version)
+                VALUES (?,?,'Test Staff','test-hash','ACTIVE',?,?,?,4)
                 """, id, id + "@example.test", Timestamp.from(created),
                 Timestamp.from(created), Timestamp.from(created));
         }

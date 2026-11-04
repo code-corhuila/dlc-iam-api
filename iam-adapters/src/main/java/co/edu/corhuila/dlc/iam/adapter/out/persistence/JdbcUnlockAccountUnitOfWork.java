@@ -62,10 +62,16 @@ public final class JdbcUnlockAccountUnitOfWork implements UnlockAccountUnitOfWor
         @Override
         public Account findForUpdate(UUID userId) {
             var rows = jdbc.query("""
-                SELECT user_id, status, email_verified_at IS NOT NULL AS verified, version
+                SELECT user_id, email, display_name, status, created_at, updated_at,
+                       email_verified_at IS NOT NULL AS verified, version
                   FROM iam.users WHERE user_id = ? FOR UPDATE
                 """, (rs, row) -> new Account(rs.getObject("user_id", UUID.class),
-                    rs.getString("status"), rs.getBoolean("verified"), rs.getLong("version")),
+                    rs.getString("email"), rs.getString("display_name"),
+                    jdbc.queryForList("SELECT role FROM iam.user_roles WHERE user_id = ? ORDER BY role",
+                        String.class, userId), rs.getString("status"),
+                    rs.getTimestamp("created_at").toInstant(),
+                    rs.getTimestamp("updated_at").toInstant(),
+                    rs.getBoolean("verified"), rs.getLong("version")),
                 userId);
             return rows.isEmpty() ? null : rows.getFirst();
         }

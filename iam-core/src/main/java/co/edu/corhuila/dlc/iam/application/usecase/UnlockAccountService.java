@@ -29,17 +29,21 @@ public final class UnlockAccountService implements UnlockAccount {
                 throw new SecurityException("Administrator required");
             }
             var previous = store.findAttempt(idempotencyKey);
-            if (previous != null) {
-                return replay(previous, actorId, userId, expectedVersion, reason);
-            }
             var account = store.findForUpdate(userId);
             if (account == null) {
                 throw new NoSuchElementException("Staff not found");
             }
+            if (previous != null) {
+                return replay(previous, actorId, userId, expectedVersion, reason, account);
+            }
             // A concurrent request with the same key may have committed while row locking waited.
             previous = store.findAttempt(idempotencyKey);
             if (previous != null) {
-                return replay(previous, actorId, userId, expectedVersion, reason);
+                return replay(previous, actorId, userId, expectedVersion, reason, account);
+            }
+            // Existing accounts may predate display_name. Return a contract-valid Staff or roll back.
+            if (account.name() == null || account.name().isBlank()) {
+                throw new ConcurrentModificationException("Staff name must be set before unlock");
             }
             if (account.version() != expectedVersion || !"LOCKED".equals(account.status())
                 || !account.verified()) {
@@ -50,17 +54,28 @@ public final class UnlockAccountService implements UnlockAccount {
             store.appendAudit(userId, actorId, reason, expectedVersion, expectedVersion + 1,
                 idempotencyKey, correlationId, now);
             store.appendUserUnlocked(userId, actorId, idempotencyKey, correlationId, now);
-            return new Result(userId, "ACTIVE", expectedVersion + 1);
+            return result(account, "ACTIVE", now, expectedVersion + 1);
         });
     }
 
     private static Result replay(UnlockAccountUnitOfWork.Attempt previous, UUID actorId,
-                                 UUID userId, long expectedVersion, String reason) {
+                                 UUID userId, long expectedVersion, String reason,
+                                 UnlockAccountUnitOfWork.Account account) {
         if (!previous.actorId().equals(actorId) || !previous.userId().equals(userId)
             || previous.expectedVersion() != expectedVersion
             || !previous.reason().equals(reason)) {
             throw new ConcurrentModificationException("Idempotency key reused");
         }
-        return new Result(userId, "ACTIVE", previous.resultVersion());
+        if (account.version() != previous.resultVersion() || !"ACTIVE".equals(account.status())
+            || account.name() == null || account.name().isBlank()) {
+            throw new ConcurrentModificationException("Staff changed after original unlock");
+        }
+        return result(account, account.status(), account.updatedAt(), account.version());
+    }
+
+    private static Result result(UnlockAccountUnitOfWork.Account account, String status,
+                                 java.time.Instant updatedAt, long version) {
+        return new Result(account.userId(), account.email(), account.name(), account.roles(),
+            status, account.createdAt(), updatedAt, version);
     }
 }
