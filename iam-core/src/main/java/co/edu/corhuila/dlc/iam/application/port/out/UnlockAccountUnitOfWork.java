@@ -1,6 +1,7 @@
 package co.edu.corhuila.dlc.iam.application.port.out;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import java.util.function.Function;
 
@@ -20,7 +21,9 @@ public interface UnlockAccountUnitOfWork {
                                 UUID correlationId, Instant at);
     }
 
-    record Account(UUID userId, String status, boolean verified, long version) { }
+    record Account(UUID userId, String email, String name, List<String> roles,
+                   String status, Instant createdAt, Instant updatedAt,
+                   boolean verified, long version) { }
     record Attempt(UUID actorId, UUID userId, String reason,
                    long expectedVersion, long resultVersion) { }
 }
