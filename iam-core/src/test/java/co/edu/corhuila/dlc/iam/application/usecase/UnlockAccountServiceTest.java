@@ -7,6 +7,7 @@ import co.edu.corhuila.dlc.iam.application.port.out.UnlockAccountUnitOfWork;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.ConcurrentModificationException;
 import java.util.NoSuchElementException;
 import java.util.UUID;
@@ -27,6 +28,9 @@ class UnlockAccountServiceTest {
     void unlocksOnlyVerifiedLockedStaffAndRecordsOneEvent() {
         var result = service.unlock(admin, staff, 4, "Administrator reviewed lock", key, correlation);
         assertEquals("ACTIVE", result.status());
+        assertEquals("Ada Staff", result.name());
+        assertEquals(List.of("DENTIST"), result.roles());
+        assertEquals(now, result.updatedAt());
         assertEquals(5, result.version());
         assertEquals(1, store.stateWrites);
         assertEquals(1, store.audits);
@@ -40,7 +44,7 @@ class UnlockAccountServiceTest {
     void exactRetryReturnsOriginalResultWithoutNewEffects() {
         store.attempt = new UnlockAccountUnitOfWork.Attempt(admin, staff,
             "Administrator reviewed lock", 4, 5);
-        store.account = new UnlockAccountUnitOfWork.Account(staff, "ACTIVE", true, 7);
+        store.account = account("ACTIVE", true, 5);
         var result = service.unlock(admin, staff, 4, "Administrator reviewed lock", key, correlation);
         assertEquals(5, result.version());
         assertEquals(0, store.stateWrites);
@@ -52,7 +56,7 @@ class UnlockAccountServiceTest {
     void retryThatCommitsWhileWaitingForTargetLockReturnsOriginalResult() {
         store.lateAttempt = new UnlockAccountUnitOfWork.Attempt(admin, staff,
             "Administrator reviewed lock", 4, 5);
-        store.account = new UnlockAccountUnitOfWork.Account(staff, "ACTIVE", true, 5);
+        store.account = account("ACTIVE", true, 5);
         var result = service.unlock(admin, staff, 4, "Administrator reviewed lock", key, correlation);
         assertEquals(5, result.version());
         assertEquals(0, store.stateWrites);
@@ -77,10 +81,10 @@ class UnlockAccountServiceTest {
         assertThrows(NoSuchElementException.class,
             () -> service.unlock(admin, staff, 4, "Reason", key, correlation));
         for (var account : new UnlockAccountUnitOfWork.Account[] {
-            new UnlockAccountUnitOfWork.Account(staff, "DISABLED", true, 4),
-            new UnlockAccountUnitOfWork.Account(staff, "PENDING_VERIFICATION", false, 4),
-            new UnlockAccountUnitOfWork.Account(staff, "LOCKED", false, 4),
-            new UnlockAccountUnitOfWork.Account(staff, "LOCKED", true, 5)
+            account("DISABLED", true, 4),
+            account("PENDING_VERIFICATION", false, 4),
+            account("LOCKED", false, 4),
+            account("LOCKED", true, 5)
         }) {
             store.account = account;
             assertThrows(ConcurrentModificationException.class,
@@ -112,9 +116,33 @@ class UnlockAccountServiceTest {
         assertEquals(0, store.audits);
     }
 
+    @Test
+    void missingLegacyNameRejectsBeforeAnyWrite() {
+        store.account = new UnlockAccountUnitOfWork.Account(staff, "ada@example.test", null,
+            List.of("DENTIST"), "LOCKED", now.minusSeconds(100), now, true, 4);
+        assertThrows(ConcurrentModificationException.class,
+            () -> service.unlock(admin, staff, 4, "Reason", key, correlation));
+        assertEquals(0, store.stateWrites);
+        assertEquals(0, store.audits);
+    }
+
+    @Test
+    void oldReplayAfterFurtherAccountChangeConflicts() {
+        store.attempt = new UnlockAccountUnitOfWork.Attempt(admin, staff, "Reason", 4, 5);
+        store.account = account("ACTIVE", true, 7);
+        assertThrows(ConcurrentModificationException.class,
+            () -> service.unlock(admin, staff, 4, "Reason", key, correlation));
+    }
+
+    private UnlockAccountUnitOfWork.Account account(String status, boolean verified, long version) {
+        return new UnlockAccountUnitOfWork.Account(staff, "ada@example.test", "Ada Staff",
+            List.of("DENTIST"), status, now.minusSeconds(100), now.minusSeconds(10),
+            verified, version);
+    }
+
     private final class FakeUnitOfWork implements UnlockAccountUnitOfWork,
                                                   UnlockAccountUnitOfWork.Store {
-        Account account = new Account(staff, "LOCKED", true, 4);
+        Account account = account("LOCKED", true, 4);
         Attempt attempt;
         Attempt lateAttempt;
         int attemptReads;
