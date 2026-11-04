@@ -12,7 +12,8 @@ public interface RoleAssignmentUnitOfWork {
     interface Store {
         boolean activeAdministratorForUpdate(UUID actorId);
         StaffAccount findForUpdate(UUID userId);
-        void replaceRoles(UUID userId, List<String> roles, long expectedVersion);
+        void replaceRoles(UUID userId, List<String> roles, long expectedVersion,
+                          UUID actorId, Instant at);
         void appendAudit(UUID userId, String role, String action, UUID actorId,
                          String reason, UUID correlationId, Instant at);
         void appendRoleEvent(String eventType, UUID userId, String role,
