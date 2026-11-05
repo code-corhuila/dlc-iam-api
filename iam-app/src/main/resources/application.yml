@@ -5,3 +5,16 @@ spring:
     url: ${IAM_DATABASE_URL}
     username: ${IAM_DATABASE_USER}
     password: ${IAM_DATABASE_PASSWORD}
+  mail:
+    host: ${IAM_EMAIL_SMTP_HOST}
+    port: ${IAM_EMAIL_SMTP_PORT:587}
+    username: ${IAM_EMAIL_SMTP_USER}
+    password: ${IAM_EMAIL_SMTP_PASSWORD}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: true
+      mail.smtp.starttls.required: true
+      mail.smtp.ssl.checkserveridentity: true
+      mail.smtp.connectiontimeout: 3000
+      mail.smtp.timeout: 3000
+      mail.smtp.writetimeout: 3000
