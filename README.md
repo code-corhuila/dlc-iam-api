@@ -77,6 +77,12 @@ Set `IAM_CSRF_KEY_BASE64` to a separate Base64-encoded random key of at least 32
 
 IAM checks the staff JWT signature, issuer, audience, expiry, session revocation, account state, inactivity deadline, and current roles. Invalid staff tokens return `active: false`; a database outage returns 503 so callers can fail closed. Token bodies are not logged.
 
+## IAM event publishing
+
+Set `IAM_RABBITMQ_HOST`, `IAM_RABBITMQ_USER`, `IAM_RABBITMQ_PASSWORD`, and optionally `IAM_RABBITMQ_PORT` and `IAM_OUTBOX_EXCHANGE`. The IAM API declares a durable topic exchange (default `iam.events.v1`) and publishes persistent, version 1 JSON envelopes using routing keys `iam.<EventType>.v1`. The broker must have a matching durable queue binding before events can be marked published. Broker acknowledgement without a route counts as failure. Event IDs stay stable across retries; consumers must deduplicate by `eventId`.
+
+The outbox dispatcher stores failed attempts and reconciliation state in IAM PostgreSQL. Publishing is at least once: broker acceptance followed by a database commit failure can cause a duplicate on retry. The scheduler that invokes the dispatcher is delivered separately.
+
 ## Requirements
 
 - Java 21
