@@ -35,9 +35,10 @@ class EnableStaffJdbcIT {
         for (UUID id : new UUID[] {admin, verified, unverified}) {
             jdbc.update("""
                 INSERT INTO iam.users
-                  (user_id,email,password_hash,status,email_verified_at,created_at,updated_at,version)
-                VALUES (?,?,'test-hash',?,?,?,?,1)
-                """, id, id + "@example.test", id.equals(admin) ? "ACTIVE" : "DISABLED",
+                  (user_id,email,display_name,password_hash,status,email_verified_at,created_at,updated_at,version)
+                VALUES (?,?,?,'test-hash',?,?,?,?,1)
+                """, id, id + "@example.test", "Ada Staff",
+                id.equals(admin) ? "ACTIVE" : "DISABLED",
                 id.equals(unverified) ? null : Timestamp.from(at),
                 Timestamp.from(at), Timestamp.from(at));
         }
