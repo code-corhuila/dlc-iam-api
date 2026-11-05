@@ -41,6 +41,7 @@ class DisableStaffAccountServiceTest {
     @Test
     void exactRetryReturnsOriginalVersionWithoutAnotherWrite() {
         store.attempt = attempt();
+        store.account = account("DISABLED", 2, List.of("DENTIST"));
         var result = service.disable(actor, staff, 1, "Employment ended", key, correlation);
         assertEquals(2, result.version());
         assertEquals(0, store.disables);
@@ -51,6 +52,7 @@ class DisableStaffAccountServiceTest {
     @Test
     void rechecksAttemptAfterTargetLockForConcurrentReplay() {
         store.attemptAfterLock = attempt();
+        store.account = account("DISABLED", 2, List.of("DENTIST"));
         var result = service.disable(actor, staff, 1, "Employment ended", key, correlation);
         assertEquals(2, result.version());
         assertEquals(0, store.disables);
@@ -62,16 +64,13 @@ class DisableStaffAccountServiceTest {
         assertThrows(ConcurrentModificationException.class,
             () -> service.disable(actor, staff, 1, "Employment ended", key, correlation));
         store.attempt = null;
-        store.account = new DisableStaffUnitOfWork.Account(staff, "DISABLED", 1,
-            List.of("DENTIST"));
+        store.account = account("DISABLED", 1, List.of("DENTIST"));
         assertThrows(ConcurrentModificationException.class,
             () -> service.disable(actor, staff, 1, "Employment ended", key, correlation));
-        store.account = new DisableStaffUnitOfWork.Account(staff, "ACTIVE", 2,
-            List.of("DENTIST"));
+        store.account = account("ACTIVE", 2, List.of("DENTIST"));
         assertThrows(ConcurrentModificationException.class,
             () -> service.disable(actor, staff, 1, "Employment ended", key, correlation));
-        store.account = new DisableStaffUnitOfWork.Account(staff, "ACTIVE", 1,
-            List.of("ADMINISTRATOR"));
+        store.account = account("ACTIVE", 1, List.of("ADMINISTRATOR"));
         assertThrows(SecurityException.class,
             () -> service.disable(actor, staff, 1, "Employment ended", key, correlation));
         assertEquals(0, store.disables);
@@ -96,6 +95,19 @@ class DisableStaffAccountServiceTest {
     }
 
     @Test
+    void legacyMissingNameAndStaleReplayDoNotMutateAccount() {
+        store.account = new DisableStaffUnitOfWork.Account(staff, "ada@example.test", null,
+            "ACTIVE", 1, List.of("DENTIST"), NOW.minusSeconds(3600), NOW);
+        assertThrows(ConcurrentModificationException.class,
+            () -> service.disable(actor, staff, 1, "Employment ended", key, correlation));
+        store.account = account("ACTIVE", 3, List.of("DENTIST"));
+        store.attempt = attempt();
+        assertThrows(ConcurrentModificationException.class,
+            () -> service.disable(actor, staff, 1, "Employment ended", key, correlation));
+        assertEquals(0, store.disables);
+    }
+
+    @Test
     void outboxFailurePreventsTransactionCommit() {
         store.failEvent = true;
         assertThrows(IllegalStateException.class,
@@ -107,8 +119,14 @@ class DisableStaffAccountServiceTest {
         return new DisableStaffUnitOfWork.Attempt(actor, staff, "Employment ended", 1, 2);
     }
 
+    private DisableStaffUnitOfWork.Account account(String status, long version,
+                                                   List<String> roles) {
+        return new DisableStaffUnitOfWork.Account(staff, "ada@example.test", "Ada Staff",
+            status, version, roles, NOW.minusSeconds(3600), NOW);
+    }
+
     private final class FakeStore implements DisableStaffUnitOfWork, DisableStaffUnitOfWork.Store {
-        Account account = new Account(staff, "ACTIVE", 1, List.of("DENTIST"));
+        Account account = account("ACTIVE", 1, List.of("DENTIST"));
         Attempt attempt;
         Attempt attemptAfterLock;
         boolean lockedTarget;

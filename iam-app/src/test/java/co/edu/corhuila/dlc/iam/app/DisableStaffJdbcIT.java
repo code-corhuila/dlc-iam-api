@@ -42,8 +42,8 @@ class DisableStaffJdbcIT {
         for (UUID id : new UUID[] {admin, staff}) {
             jdbc.update("""
                 INSERT INTO iam.users
-                  (user_id,email,password_hash,status,email_verified_at,created_at,updated_at,version)
-                VALUES (?,?,'test-hash','ACTIVE',?,?,?,1)
+                  (user_id,email,display_name,password_hash,status,email_verified_at,created_at,updated_at,version)
+                VALUES (?,?,'Staff Member','test-hash','ACTIVE',?,?,?,1)
                 """, id, id + "@example.test", Timestamp.from(created),
                 Timestamp.from(created), Timestamp.from(created));
         }
