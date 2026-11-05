@@ -12,8 +12,8 @@ public interface RegistrationUnitOfWork {
         boolean activeAdministratorForUpdate(UUID actorId);
         Attempt findAttempt(UUID idempotencyKey);
         boolean emailExists(String normalizedEmail);
-        void createStaff(UUID userId, String normalizedEmail, String passwordHash, String name,
-                         String role, Instant at);
+        void createStaff(UUID userId, UUID actorId, String normalizedEmail, String passwordHash,
+                         String name, String role, Instant at);
         void appendAudit(UUID userId, UUID actorId, UUID correlationId, Instant at);
         void appendUserRegistered(UUID userId, UUID actorId, UUID correlationId, Instant at);
         void rememberAttempt(UUID key, UUID actorId, byte[] proof, Staff staff);

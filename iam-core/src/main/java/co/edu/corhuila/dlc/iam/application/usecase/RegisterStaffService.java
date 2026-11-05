@@ -6,6 +6,7 @@ import co.edu.corhuila.dlc.iam.application.port.out.RegistrationUnitOfWork;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Clock;
+import java.time.temporal.ChronoUnit;
 import java.util.ConcurrentModificationException;
 import java.util.Locale;
 import java.util.Set;
@@ -59,9 +60,10 @@ public final class RegisterStaffService {
                 throw new ConcurrentModificationException("Staff email already exists");
             }
             UUID userId = UUID.randomUUID();
-            var at = clock.instant();
+            // PostgreSQL stores timestamptz at microsecond precision; replay must match the first response.
+            var at = clock.instant().truncatedTo(ChronoUnit.MICROS);
             String passwordHash = passwords.hash(password);
-            store.createStaff(userId, normalizedEmail, passwordHash, name, role, at);
+            store.createStaff(userId, actorId, normalizedEmail, passwordHash, name, role, at);
             store.appendAudit(userId, actorId, correlationId, at);
             store.appendUserRegistered(userId, actorId, correlationId, at);
             var staff = new RegistrationUnitOfWork.Staff(userId, normalizedEmail, name, role,
