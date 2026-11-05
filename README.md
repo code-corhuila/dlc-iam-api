@@ -81,7 +81,7 @@ IAM checks the staff JWT signature, issuer, audience, expiry, session revocation
 
 Set `IAM_RABBITMQ_HOST`, `IAM_RABBITMQ_USER`, `IAM_RABBITMQ_PASSWORD`, and optionally `IAM_RABBITMQ_PORT` and `IAM_OUTBOX_EXCHANGE`. The IAM API declares a durable topic exchange (default `iam.events.v1`) and publishes persistent, version 1 JSON envelopes using routing keys `iam.<EventType>.v1`. The broker must have a matching durable queue binding before events can be marked published. Broker acknowledgement without a route counts as failure. Event IDs stay stable across retries; consumers must deduplicate by `eventId`.
 
-The outbox dispatcher stores failed attempts and reconciliation state in IAM PostgreSQL. Publishing is at least once: broker acceptance followed by a database commit failure can cause a duplicate on retry. The scheduler that invokes the dispatcher is delivered separately.
+The scheduled dispatcher checks for due events every two seconds after a five-second startup delay and processes at most 25 per tick. Set `IAM_OUTBOX_POLL_DELAY_MS` and `IAM_OUTBOX_INITIAL_DELAY_MS` to tune the cadence. It stores failed attempts and reconciliation state in IAM PostgreSQL. Publishing is at least once: broker acceptance followed by a database commit failure can cause a duplicate on retry.
 
 ## Requirements
 
