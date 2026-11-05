@@ -28,15 +28,18 @@ public final class EnableStaffAccountService implements EnableStaffAccount {
             if (!store.activeAdministratorForUpdate(actorId)) {
                 throw new SecurityException("Administrator required");
             }
-            var replay = replay(store.findAttempt(idempotencyKey), actorId, userId,
-                expectedVersion, reason);
-            if (replay != null) return replay;
+            var attempt = store.findAttempt(idempotencyKey);
             var staff = store.findForUpdate(userId);
             if (staff == null) throw new NoSuchElementException("Staff not found");
+            if (attempt != null) return replay(attempt, actorId, userId,
+                expectedVersion, reason, staff);
             // Recheck after the row lock: a contender may have committed this key while waiting.
-            replay = replay(store.findAttempt(idempotencyKey), actorId, userId,
-                expectedVersion, reason);
-            if (replay != null) return replay;
+            attempt = store.findAttempt(idempotencyKey);
+            if (attempt != null) return replay(attempt, actorId, userId,
+                expectedVersion, reason, staff);
+            if (staff.name() == null || staff.name().isBlank()) {
+                throw new ConcurrentModificationException("Staff name must be set before enabling");
+            }
             if (staff.roles().contains("ADMINISTRATOR")) {
                 throw new SecurityException("Bootstrap Administrator cannot be enabled here");
             }
@@ -48,17 +51,29 @@ public final class EnableStaffAccountService implements EnableStaffAccount {
             store.enable(userId, expectedVersion, nextStatus, at);
             store.appendAudit(userId, actorId, nextStatus, reason, expectedVersion,
                 idempotencyKey, correlationId, at);
-            return new Result(userId, nextStatus, expectedVersion + 1);
+            return result(staff, nextStatus, at, expectedVersion + 1);
         });
     }
 
     private static Result replay(EnableStaffUnitOfWork.Attempt attempt, UUID actorId,
-                                 UUID userId, long expectedVersion, String reason) {
+                                 UUID userId, long expectedVersion, String reason,
+                                 EnableStaffUnitOfWork.Account staff) {
         if (attempt == null) return null;
         if (!attempt.actorId().equals(actorId) || !attempt.userId().equals(userId)
             || attempt.expectedVersion() != expectedVersion || !attempt.reason().equals(reason)) {
             throw new ConcurrentModificationException("Idempotency key reused");
         }
-        return new Result(userId, attempt.nextStatus(), attempt.resultVersion());
+        if (staff.version() != attempt.resultVersion()
+            || !attempt.nextStatus().equals(staff.status())
+            || staff.name() == null || staff.name().isBlank()) {
+            throw new ConcurrentModificationException("Staff changed after original enabling");
+        }
+        return result(staff, staff.status(), staff.updatedAt(), staff.version());
+    }
+
+    private static Result result(EnableStaffUnitOfWork.Account staff, String status,
+                                 java.time.Instant updatedAt, long version) {
+        return new Result(staff.userId(), staff.email(), staff.name(), staff.roles(), status,
+            staff.createdAt(), updatedAt, version);
     }
 }
