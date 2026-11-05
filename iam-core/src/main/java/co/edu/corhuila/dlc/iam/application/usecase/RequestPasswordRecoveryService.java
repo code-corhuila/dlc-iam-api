@@ -1,6 +1,7 @@
 package co.edu.corhuila.dlc.iam.application.usecase;
 
 import co.edu.corhuila.dlc.iam.application.port.out.ChallengeTokenHasher;
+import co.edu.corhuila.dlc.iam.application.port.out.IdentityEmailSender;
 import co.edu.corhuila.dlc.iam.application.port.out.RecoveryRequestLimiter;
 import co.edu.corhuila.dlc.iam.application.port.out.RecoveryRequestUnitOfWork;
 import co.edu.corhuila.dlc.iam.application.port.out.RecoveryTokenGenerator;
@@ -11,22 +12,26 @@ import java.util.UUID;
 
 public final class RequestPasswordRecoveryService {
     private static final String PURPOSE = "PASSWORD_RECOVERY";
+    private static final System.Logger LOG = System.getLogger(RequestPasswordRecoveryService.class.getName());
     private final RecoveryRequestUnitOfWork unitOfWork;
     private final RecoveryRequestLimiter limiter;
     private final RecoveryTokenGenerator tokens;
+    private final IdentityEmailSender emailSender;
     private final ChallengeTokenHasher hasher;
     private final Clock clock;
     private final Duration ttl;
 
     public RequestPasswordRecoveryService(RecoveryRequestUnitOfWork unitOfWork,
             RecoveryRequestLimiter limiter, RecoveryTokenGenerator tokens,
-            ChallengeTokenHasher hasher, Clock clock, Duration ttl) {
+            ChallengeTokenHasher hasher, IdentityEmailSender emailSender,
+            Clock clock, Duration ttl) {
         if (ttl == null || ttl.isNegative() || ttl.isZero()) {
             throw new IllegalArgumentException("Recovery expiry must be positive");
         }
         this.unitOfWork = unitOfWork;
         this.limiter = limiter;
         this.tokens = tokens;
+        this.emailSender = emailSender;
         this.hasher = hasher;
         this.clock = clock;
         this.ttl = ttl;
@@ -46,7 +51,7 @@ public final class RequestPasswordRecoveryService {
         if (!limiter.allow(requesterKey, normalized)) {
             throw new RecoveryRateLimitedException();
         }
-        unitOfWork.execute(store -> {
+        PendingDelivery pending = unitOfWork.execute(store -> {
             UUID userId = store.verifiedUserForUpdate(normalized);
             if (userId != null) {
                 String rawToken = tokens.generate();
@@ -56,9 +61,20 @@ public final class RequestPasswordRecoveryService {
                 var now = clock.instant();
                 store.createChallenge(UUID.randomUUID(), userId, PURPOSE, hasher.hash(rawToken),
                     now, now.plus(ttl));
-                store.queueDelivery(userId, normalized, rawToken, correlationId);
+                return new PendingDelivery(normalized, rawToken);
             }
             return null;
         });
+        if (pending != null) {
+            try {
+                emailSender.sendPasswordRecovery(pending.email(), pending.token(), correlationId);
+            } catch (RuntimeException providerFailure) {
+                // The challenge committed. Preserve the neutral response; a later request issues a new token.
+                LOG.log(System.Logger.Level.WARNING,
+                    "IAM recovery delivery failed; correlationId=" + correlationId);
+            }
+        }
     }
+
+    private record PendingDelivery(String email, String token) { }
 }

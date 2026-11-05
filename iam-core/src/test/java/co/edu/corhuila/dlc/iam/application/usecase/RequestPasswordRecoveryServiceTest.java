@@ -16,26 +16,37 @@ class RequestPasswordRecoveryServiceTest {
     private static final Instant NOW = Instant.parse("2026-11-05T12:00:00Z");
     private final Store store = new Store();
     private boolean permitted = true;
+    private boolean deliveryFails;
     private int generated;
     private final RequestPasswordRecoveryService service = new RequestPasswordRecoveryService(
         new RecoveryRequestUnitOfWork() {
             @Override public <T> T execute(Function<RecoveryRequestUnitOfWork.Store, T> action) {
-                return action.apply(store);
+                store.inTransaction = true;
+                try {
+                    return action.apply(store);
+                } finally {
+                    store.inTransaction = false;
+                }
             }
         }, (requester, email) -> permitted,
         () -> { generated++; return "random-opaque-token"; },
         raw -> "sha256:" + raw,
-        Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofMinutes(20));
+        (email, token, correlation) -> {
+            store.deliveredDuringTransaction = store.inTransaction;
+            if (deliveryFails) throw new IllegalStateException("provider unavailable");
+            store.deliveredToken = token;
+        }, Clock.fixed(NOW, ZoneOffset.UTC), Duration.ofMinutes(15));
 
     @Test
-    void knownVerifiedAccountCreatesOnlyHashedPurposeBoundChallengeAndQueuesDelivery() {
+    void knownVerifiedAccountCommitsHashBeforeDirectDelivery() {
         store.user = UUID.randomUUID();
         service.request("  ADA@Example.Test  ", "requester", UUID.randomUUID());
         assertEquals("ada@example.test", store.lookedUpEmail);
         assertEquals("PASSWORD_RECOVERY", store.purpose);
         assertEquals("sha256:random-opaque-token", store.savedHash);
-        assertEquals(NOW.plus(Duration.ofMinutes(20)), store.expiresAt);
+        assertEquals(NOW.plus(Duration.ofMinutes(15)), store.expiresAt);
         assertEquals("random-opaque-token", store.deliveredToken);
+        assertEquals(false, store.deliveredDuringTransaction);
         assertEquals(1, generated);
     }
 
@@ -57,6 +68,25 @@ class RequestPasswordRecoveryServiceTest {
     }
 
     @Test
+    void providerFailureRetainsNeutralResultAndCommittedChallenge() {
+        store.user = UUID.randomUUID();
+        deliveryFails = true;
+        service.request("ada@example.test", "requester", UUID.randomUUID());
+        assertEquals("sha256:random-opaque-token", store.savedHash);
+        assertEquals(null, store.deliveredToken);
+        assertEquals(false, store.deliveredDuringTransaction);
+    }
+
+    @Test
+    void failedChallengeTransactionNeverCallsProvider() {
+        store.user = UUID.randomUUID();
+        store.persistenceFails = true;
+        assertThrows(IllegalStateException.class,
+            () -> service.request("ada@example.test", "requester", UUID.randomUUID()));
+        assertEquals(null, store.deliveredToken);
+    }
+
+    @Test
     void rejectsMalformedRequestsWithoutLookup() {
         assertThrows(IllegalArgumentException.class,
             () -> service.request("not-an-email", "requester", UUID.randomUUID()));
@@ -72,6 +102,9 @@ class RequestPasswordRecoveryServiceTest {
         String savedHash;
         String deliveredToken;
         Instant expiresAt;
+        boolean inTransaction;
+        boolean deliveredDuringTransaction;
+        boolean persistenceFails;
 
         @Override public UUID verifiedUserForUpdate(String email) {
             lookedUpEmail = email;
@@ -81,13 +114,9 @@ class RequestPasswordRecoveryServiceTest {
         @Override public void createChallenge(UUID challengeId, UUID userId, String intendedPurpose,
                 String tokenHash, Instant createdAt, Instant deadline) {
             purpose = intendedPurpose;
+            if (persistenceFails) throw new IllegalStateException("database unavailable");
             savedHash = tokenHash;
             expiresAt = deadline;
-        }
-
-        @Override public void queueDelivery(UUID userId, String email, String rawToken,
-                UUID correlationId) {
-            deliveredToken = rawToken;
         }
     }
 }
