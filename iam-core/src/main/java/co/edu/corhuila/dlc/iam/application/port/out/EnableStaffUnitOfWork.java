@@ -18,8 +18,8 @@ public interface EnableStaffUnitOfWork {
                          long expectedVersion, UUID idempotencyKey, UUID correlationId, Instant at);
     }
 
-    record Account(UUID userId, String status, boolean verified, long version,
-                   List<String> roles) { }
+    record Account(UUID userId, String email, String name, String status, boolean verified,
+                   Instant createdAt, Instant updatedAt, long version, List<String> roles) { }
     record Attempt(UUID actorId, UUID userId, String reason, long expectedVersion,
                    String nextStatus, long resultVersion) { }
 }

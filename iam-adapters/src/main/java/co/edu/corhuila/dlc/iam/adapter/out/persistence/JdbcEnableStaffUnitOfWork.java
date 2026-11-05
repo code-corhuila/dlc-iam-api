@@ -55,10 +55,13 @@ public final class JdbcEnableStaffUnitOfWork implements EnableStaffUnitOfWork {
         @Override
         public Account findForUpdate(UUID userId) {
             var rows = jdbc.query("""
-                SELECT user_id,status,email_verified_at,version FROM iam.users
+                SELECT user_id,email,display_name,status,email_verified_at,created_at,updated_at,
+                       version FROM iam.users
                  WHERE user_id = ? FOR UPDATE
                 """, (rs, row) -> new Account(rs.getObject(1, UUID.class), rs.getString(2),
-                rs.getTimestamp(3) != null, rs.getLong(4), jdbc.queryForList(
+                rs.getString(3), rs.getString(4), rs.getTimestamp(5) != null,
+                rs.getTimestamp(6).toInstant(), rs.getTimestamp(7).toInstant(), rs.getLong(8),
+                jdbc.queryForList(
                     "SELECT role FROM iam.user_roles WHERE user_id = ? ORDER BY role",
                     String.class, userId)), userId);
             return rows.isEmpty() ? null : rows.getFirst();
