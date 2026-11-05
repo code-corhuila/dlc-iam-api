@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import co.edu.corhuila.dlc.iam.adapter.out.persistence.JdbcRegistrationUnitOfWork;
 import co.edu.corhuila.dlc.iam.adapter.out.security.BcryptPasswordHasher;
 import co.edu.corhuila.dlc.iam.adapter.out.security.HmacRegistrationRequestProof;
+import co.edu.corhuila.dlc.iam.adapter.out.security.Sha256ChallengeTokenHasher;
 import co.edu.corhuila.dlc.iam.application.usecase.RegisterStaffService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Timestamp;
@@ -34,7 +35,8 @@ class RegistrationJdbcIT {
         var service = new RegisterStaffService(new JdbcRegistrationUnitOfWork(jdbc,
             new TransactionTemplate(new DataSourceTransactionManager(source)), new ObjectMapper()),
             new BcryptPasswordHasher(), new HmacRegistrationRequestProof(new byte[32]),
-            Clock.systemUTC());
+            Clock.systemUTC(), () -> "initial-verification-token",
+            new Sha256ChallengeTokenHasher(), (email, token, correlationId) -> {});
         UUID admin = UUID.randomUUID();
         Instant at = Instant.now().minusSeconds(60);
         jdbc.update("""
@@ -57,6 +59,7 @@ class RegistrationJdbcIT {
         assertEquals(1, count(jdbc, "SELECT count(*) FROM iam.user_roles WHERE user_id=?", first.id()));
         assertEquals(1, count(jdbc, "SELECT count(*) FROM iam.staff_account_audit WHERE user_id=?", first.id()));
         assertEquals(1, count(jdbc, "SELECT count(*) FROM iam.outbox_events WHERE aggregate_id=?", first.id()));
+        assertEquals(1, count(jdbc, "SELECT count(*) FROM iam.security_challenges WHERE user_id=?", first.id()));
         byte[] proof = jdbc.queryForObject(
             "SELECT request_proof FROM iam.registration_requests WHERE idempotency_key=?",
             byte[].class, key);
@@ -67,6 +70,7 @@ class RegistrationJdbcIT {
             "DENTIST", key, UUID.randomUUID());
         assertEquals(first, replay);
         assertEquals(1, count(jdbc, "SELECT count(*) FROM iam.outbox_events WHERE aggregate_id=?", first.id()));
+        assertEquals(1, count(jdbc, "SELECT count(*) FROM iam.security_challenges WHERE user_id=?", first.id()));
         assertThrows(ConcurrentModificationException.class, () -> service.register(admin,
             email, "Password2", "Ada Staff", "DENTIST", key, UUID.randomUUID()));
 

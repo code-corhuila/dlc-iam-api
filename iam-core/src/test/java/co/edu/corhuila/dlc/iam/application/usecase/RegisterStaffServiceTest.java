@@ -18,10 +18,18 @@ class RegisterStaffServiceTest {
     private final UUID key = UUID.randomUUID();
     private final UUID correlation = UUID.randomUUID();
     private final FakeStore store = new FakeStore();
+    private int deliveries;
     private final RegisterStaffService service = new RegisterStaffService(store, raw -> "bcrypt-hash",
         (email, password, name, role) -> (email + "|" + password + "|" + name + "|" + role)
             .getBytes(StandardCharsets.UTF_8),
-        Clock.fixed(Instant.parse("2026-11-05T12:00:00Z"), ZoneOffset.UTC));
+        Clock.fixed(Instant.parse("2026-11-05T12:00:00Z"), ZoneOffset.UTC),
+        () -> "opaque-token", raw -> "hash-of-" + raw,
+        (email, token, id) -> {
+            assertEquals("staff@example.test", email);
+            assertEquals("opaque-token", token);
+            assertEquals(true, store.committed);
+            deliveries++;
+        });
 
     @Test
     void createsPendingStaffWithNormalizedEmailAndAtomicOwnerOperations() {
@@ -35,6 +43,9 @@ class RegisterStaffServiceTest {
         assertEquals(1, store.audits);
         assertEquals(1, store.events);
         assertEquals(1, store.attempts);
+        assertEquals(1, store.challenges);
+        assertEquals("hash-of-opaque-token", store.tokenHash);
+        assertEquals(1, deliveries);
     }
 
     @Test
@@ -46,8 +57,25 @@ class RegisterStaffServiceTest {
         assertEquals(first, replay);
         assertEquals(1, store.creates);
         assertEquals(1, store.events);
+        assertEquals(1, store.challenges);
+        assertEquals(1, deliveries);
         assertThrows(ConcurrentModificationException.class, () -> service.register(admin,
             "staff@example.test", "ChangedPass9", "Ada Staff", "DENTIST", key, correlation));
+    }
+
+    @Test
+    void providerFailureDoesNotUndoRegistration() {
+        var failing = new RegisterStaffService(store, raw -> "bcrypt-hash",
+            (email, password, name, role) -> (email + "|" + password + "|" + name + "|" + role)
+                .getBytes(StandardCharsets.UTF_8),
+            Clock.fixed(Instant.parse("2026-11-05T12:00:00Z"), ZoneOffset.UTC),
+            () -> "opaque-token", raw -> "hash-of-" + raw,
+            (email, token, id) -> { throw new IllegalStateException("provider unavailable"); });
+        var staff = failing.register(admin, "staff@example.test", "GoodPass9", "Ada Staff",
+            "DENTIST", key, correlation);
+        assertEquals("PENDING_VERIFICATION", staff.status());
+        assertEquals(1, store.challenges);
+        assertEquals(1, store.events);
     }
 
     @Test
@@ -87,13 +115,18 @@ class RegisterStaffServiceTest {
         int audits;
         int events;
         int attempts;
+        int challenges;
+        String tokenHash;
+        boolean committed;
         String passwordHash;
         Attempt attempt;
 
         @Override
         public <T> T execute(Function<Store, T> operation) {
             transactions++;
-            return operation.apply(this);
+            T result = operation.apply(this);
+            committed = true;
+            return result;
         }
 
         @Override
@@ -110,6 +143,14 @@ class RegisterStaffServiceTest {
                                 String name, String role, Instant at) {
             creates++;
             passwordHash = hash;
+        }
+
+        @Override
+        public void createVerificationChallenge(UUID challengeId, UUID userId, String hash,
+                                                Instant createdAt, Instant expiresAt) {
+            challenges++;
+            tokenHash = hash;
+            assertEquals(createdAt.plusSeconds(86400), expiresAt);
         }
 
         @Override

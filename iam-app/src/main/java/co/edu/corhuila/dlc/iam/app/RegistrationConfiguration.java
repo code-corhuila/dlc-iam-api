@@ -4,6 +4,9 @@ import co.edu.corhuila.dlc.iam.adapter.out.security.HmacRegistrationRequestProof
 import co.edu.corhuila.dlc.iam.application.port.out.PasswordHasher;
 import co.edu.corhuila.dlc.iam.application.port.out.RegistrationRequestProof;
 import co.edu.corhuila.dlc.iam.application.port.out.RegistrationUnitOfWork;
+import co.edu.corhuila.dlc.iam.application.port.out.RecoveryTokenGenerator;
+import co.edu.corhuila.dlc.iam.application.port.out.ChallengeTokenHasher;
+import co.edu.corhuila.dlc.iam.application.port.out.VerificationEmailSender;
 import co.edu.corhuila.dlc.iam.application.usecase.RegisterStaffService;
 import java.time.Clock;
 import java.util.Base64;
@@ -21,7 +24,10 @@ class RegistrationConfiguration {
 
     @Bean
     RegisterStaffService registerStaffService(RegistrationUnitOfWork unitOfWork,
-            PasswordHasher passwords, RegistrationRequestProof proofs, Clock iamClock) {
-        return new RegisterStaffService(unitOfWork, passwords, proofs, iamClock);
+            PasswordHasher passwords, RegistrationRequestProof proofs, Clock iamClock,
+            RecoveryTokenGenerator tokens, ChallengeTokenHasher hasher,
+            VerificationEmailSender emailSender) {
+        return new RegisterStaffService(unitOfWork, passwords, proofs, iamClock,
+            tokens, hasher, emailSender);
     }
 }

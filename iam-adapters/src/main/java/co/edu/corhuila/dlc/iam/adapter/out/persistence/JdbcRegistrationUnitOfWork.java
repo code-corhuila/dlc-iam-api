@@ -80,6 +80,17 @@ public final class JdbcRegistrationUnitOfWork implements RegistrationUnitOfWork 
         }
 
         @Override
+        public void createVerificationChallenge(UUID challengeId, UUID userId, String tokenHash,
+                                                Instant createdAt, Instant expiresAt) {
+            jdbc.update("""
+                INSERT INTO iam.security_challenges
+                  (challenge_id,user_id,purpose,token_hash,created_at,expires_at)
+                VALUES (?,?,'EMAIL_VERIFICATION',?,?,?)
+                """, challengeId, userId, tokenHash,
+                Timestamp.from(createdAt), Timestamp.from(expiresAt));
+        }
+
+        @Override
         public void appendAudit(UUID userId, UUID actorId, UUID correlationId, Instant at) {
             jdbc.update("""
                 INSERT INTO iam.staff_account_audit
