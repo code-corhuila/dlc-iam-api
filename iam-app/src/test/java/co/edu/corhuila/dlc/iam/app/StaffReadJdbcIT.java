@@ -34,7 +34,8 @@ class StaffReadJdbcIT {
         UUID third = UUID.randomUUID();
         // Equal timestamps prove the id tie-breaker, independent of insertion order.
         var ids = new java.util.ArrayList<>(List.of(first, second));
-        ids.sort(UUID::compareTo);
+        // PostgreSQL orders UUIDs by unsigned bytes; Java's UUID.compareTo uses signed longs.
+        ids.sort(java.util.Comparator.comparing(UUID::toString));
         insert(jdbc, ids.get(1), "Second Staff", created, "DENTIST");
         insert(jdbc, ids.get(0), "First Staff", created, "SECRETARY_ASSISTANT");
         insert(jdbc, third, "Later Staff", created.plusSeconds(1), "DENTIST");
