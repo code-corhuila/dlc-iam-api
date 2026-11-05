@@ -31,3 +31,5 @@ spring:
 iam:
   outbox:
     exchange: ${IAM_OUTBOX_EXCHANGE:iam.events.v1}
+    poll-delay-ms: ${IAM_OUTBOX_POLL_DELAY_MS:2000}
+    initial-delay-ms: ${IAM_OUTBOX_INITIAL_DELAY_MS:5000}
