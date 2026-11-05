@@ -47,6 +47,7 @@ class EnableStaffAccountServiceTest {
 
     @Test
     void exactRetryAndConcurrentReplayDoNotWriteAgain() {
+        store.account = account(true, 2, "ACTIVE", List.of("DENTIST"));
         store.attempt = attempt();
         assertEquals(2, service.enable(actor, staff, 1, "Employment resumed", key,
             correlation).version());
@@ -103,9 +104,24 @@ class EnableStaffAccountServiceTest {
         assertEquals(0, store.commits);
     }
 
+    @Test
+    void legacyMissingNameAndStaleReplayDoNotMutate() {
+        store.account = new EnableStaffUnitOfWork.Account(staff, "staff@example.test", null,
+            "DISABLED", true, NOW.minusSeconds(3600), NOW, 1, List.of("DENTIST"));
+        assertThrows(ConcurrentModificationException.class,
+            () -> service.enable(actor, staff, 1, "Employment resumed", key, correlation));
+        assertEquals(0, store.writes);
+        store.account = account(true, 3, "ACTIVE", List.of("DENTIST"));
+        store.attempt = attempt();
+        assertThrows(ConcurrentModificationException.class,
+            () -> service.enable(actor, staff, 1, "Employment resumed", key, correlation));
+        assertEquals(0, store.writes);
+    }
+
     private EnableStaffUnitOfWork.Account account(boolean verified, long version,
                                                   String status, List<String> roles) {
-        return new EnableStaffUnitOfWork.Account(staff, status, verified, version, roles);
+        return new EnableStaffUnitOfWork.Account(staff, "staff@example.test", "Ada Staff",
+            status, verified, NOW.minusSeconds(3600), NOW, version, roles);
     }
 
     private EnableStaffUnitOfWork.Attempt attempt() {
