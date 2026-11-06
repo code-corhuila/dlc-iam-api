@@ -11,7 +11,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 @Repository
-public final class JdbcSessionSnapshotReader implements SessionSnapshotReader {
+public class JdbcSessionSnapshotReader implements SessionSnapshotReader {
     private final JdbcTemplate jdbc;
 
     public JdbcSessionSnapshotReader(JdbcTemplate jdbc) {

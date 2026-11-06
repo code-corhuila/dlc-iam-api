@@ -8,7 +8,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** Claims one due owner event; a broker failure never undoes its business change. */
 @Repository
-public final class JdbcOutboxDelivery {
+public class JdbcOutboxDelivery {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
 

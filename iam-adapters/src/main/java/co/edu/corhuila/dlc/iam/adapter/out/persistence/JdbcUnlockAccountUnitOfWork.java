@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
-public final class JdbcUnlockAccountUnitOfWork implements UnlockAccountUnitOfWork {
+public class JdbcUnlockAccountUnitOfWork implements UnlockAccountUnitOfWork {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;

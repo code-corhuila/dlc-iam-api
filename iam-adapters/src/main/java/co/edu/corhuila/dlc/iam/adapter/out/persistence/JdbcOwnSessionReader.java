@@ -8,7 +8,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
-public final class JdbcOwnSessionReader implements OwnSessionReader {
+public class JdbcOwnSessionReader implements OwnSessionReader {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate snapshot;
 

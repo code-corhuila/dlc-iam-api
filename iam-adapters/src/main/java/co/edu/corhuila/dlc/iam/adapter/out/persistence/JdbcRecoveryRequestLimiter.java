@@ -17,7 +17,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /** Atomic, owner-scoped rate limits shared by all Auth instances. */
 @Repository
-public final class JdbcRecoveryRequestLimiter implements RecoveryRequestLimiter, VerificationRequestLimiter {
+public class JdbcRecoveryRequestLimiter implements RecoveryRequestLimiter, VerificationRequestLimiter {
     private static final Duration IP_WINDOW = Duration.ofMinutes(5);
     private static final Duration EMAIL_WINDOW = Duration.ofHours(1);
     private static final Duration EMAIL_COOLDOWN = Duration.ofSeconds(60);

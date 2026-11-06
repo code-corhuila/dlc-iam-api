@@ -13,7 +13,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
-public final class JdbcPasswordResetUnitOfWork implements PasswordResetUnitOfWork {
+public class JdbcPasswordResetUnitOfWork implements PasswordResetUnitOfWork {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;
