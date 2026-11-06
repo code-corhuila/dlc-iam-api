@@ -91,6 +91,8 @@ IAM checks the staff JWT signature, issuer, audience, expiry, session revocation
 
 Login and refresh derive JWT permissions from current approved staff roles. Administrator receives `clinical:read`, `patients:read`, `patients:register`, and `patients:write`; Secretary/Assistant receives the three Patients permissions; Dentist receives only `patients:read`. Administrator never receives `clinical:write`, and individual clinical grants are outside this policy. `patients:deactivate` remains withheld until that operation is integrated. Role changes revoke existing IAM sessions, so a previous token cannot be reused through current-session validation. Patients and Clinical still enforce their own role, assignment, field, and lifecycle checks. See [ADR-019](https://github.com/code-corhuila/dlc-docs/pull/161) for the approved single-clinic policy.
 
+The internal session-validation endpoint and IAM's own protected operations compare the token's permissions with the current approved role grants. A token carrying an unapproved grant or an old permission set is inactive even if its signature, session and roles are otherwise valid.
+
 ## IAM event publishing
 
 Set `IAM_RABBITMQ_HOST`, `IAM_RABBITMQ_USER`, `IAM_RABBITMQ_PASSWORD`, and optionally `IAM_RABBITMQ_PORT` and `IAM_OUTBOX_EXCHANGE`. The IAM API declares a durable topic exchange (default `iam.events.v1`) and publishes persistent, version 1 JSON envelopes using routing keys `iam.<EventType>.v1`. The broker must have a matching durable queue binding before events can be marked published. Broker acknowledgement without a route counts as failure. Event IDs stay stable across retries; consumers must deduplicate by `eventId`.
