@@ -19,9 +19,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 public final class EmailVerificationRequestController {
     private final RequestEmailVerificationService verification;
+    private final TrustedGatewayClientAddress clientAddress;
 
-    public EmailVerificationRequestController(RequestEmailVerificationService verification) {
+    public EmailVerificationRequestController(RequestEmailVerificationService verification,
+                                              TrustedGatewayClientAddress clientAddress) {
         this.verification = verification;
+        this.clientAddress = clientAddress;
     }
 
     @PostMapping("/email-verification-requests")
@@ -34,8 +37,8 @@ public final class EmailVerificationRequestController {
                 "Invalid verification request", correlationId);
         }
         try {
-            // Do not trust client-supplied forwarding headers without an approved proxy policy.
-            verification.request(body.get("email").asText(), request.getRemoteAddr(), correlationId);
+            verification.request(body.get("email").asText(),
+                clientAddress.resolve(request).getHostAddress(), correlationId);
             return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .header("X-Correlation-Id", correlationId.toString())
                 .body(Map.of("message", "If the address is eligible, verification instructions will be sent."));

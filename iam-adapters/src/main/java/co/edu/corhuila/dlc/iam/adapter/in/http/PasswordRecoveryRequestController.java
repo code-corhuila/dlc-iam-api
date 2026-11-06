@@ -19,9 +19,12 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/auth")
 public final class PasswordRecoveryRequestController {
     private final RequestPasswordRecoveryService recovery;
+    private final TrustedGatewayClientAddress clientAddress;
 
-    public PasswordRecoveryRequestController(RequestPasswordRecoveryService recovery) {
+    public PasswordRecoveryRequestController(RequestPasswordRecoveryService recovery,
+                                             TrustedGatewayClientAddress clientAddress) {
         this.recovery = recovery;
+        this.clientAddress = clientAddress;
     }
 
     @PostMapping("/password-recovery-requests")
@@ -34,8 +37,8 @@ public final class PasswordRecoveryRequestController {
                 "Invalid recovery request", correlationId);
         }
         try {
-            // Forwarded headers are not trusted until a proxy policy identifies a trusted hop.
-            recovery.request(body.get("email").asText(), request.getRemoteAddr(), correlationId);
+            recovery.request(body.get("email").asText(),
+                clientAddress.resolve(request).getHostAddress(), correlationId);
             return ResponseEntity.ok().cacheControl(CacheControl.noStore())
                 .header("X-Correlation-Id", correlationId.toString())
                 .body(Map.of("message", "If the address is eligible, recovery instructions will be sent."));
