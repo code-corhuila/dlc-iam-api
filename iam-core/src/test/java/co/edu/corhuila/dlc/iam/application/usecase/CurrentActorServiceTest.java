@@ -20,7 +20,7 @@ class CurrentActorServiceTest {
     private final AccessTokenVerifier verifier = token -> {
         if (!"valid".equals(token)) throw new IllegalArgumentException();
         return new AccessTokenVerifier.VerifiedAccessToken(user, session,
-            List.of("ADMINISTRATOR"));
+            List.of("ADMINISTRATOR"), ApprovedStaffPermissions.forRoles(List.of("ADMINISTRATOR")));
     };
 
     @Test

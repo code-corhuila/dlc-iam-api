@@ -20,7 +20,8 @@ public final class CurrentActorService {
         }
         try {
             var identity = tokens.verify(authorization.substring(7));
-            if (!sessions.active(identity.userId(), identity.sessionId(), identity.roles())) {
+            if (!sessions.active(identity.userId(), identity.sessionId(), identity.roles(),
+                    identity.permissions())) {
                 throw new InvalidLoginException();
             }
             return new Actor(identity.userId(), identity.sessionId(), List.copyOf(identity.roles()));

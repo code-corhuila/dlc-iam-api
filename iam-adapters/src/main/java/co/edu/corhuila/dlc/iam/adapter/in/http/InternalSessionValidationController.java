@@ -56,7 +56,8 @@ public class InternalSessionValidationController {
         }
         try {
             var staff = staffTokens.verify(body.get("accessToken").asText());
-            boolean active = sessions.active(staff.userId(), staff.sessionId(), staff.roles());
+            boolean active = sessions.active(staff.userId(), staff.sessionId(), staff.roles(),
+                staff.permissions());
             return ResponseEntity.ok(Map.of("active", active));
         } catch (IllegalArgumentException invalid) {
             return ResponseEntity.ok(Map.of("active", false));

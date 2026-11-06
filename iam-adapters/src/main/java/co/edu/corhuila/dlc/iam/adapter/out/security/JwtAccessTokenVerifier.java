@@ -22,15 +22,21 @@ public final class JwtAccessTokenVerifier implements AccessTokenVerifier {
         try {
             Jwt jwt = decoder.decode(token);
             Object roles = jwt.getClaims().get("roles");
+            Object permissions = jwt.getClaims().get("permissions");
             if (jwt.getSubject() == null || jwt.getClaimAsString("sid") == null
-                || jwt.getId() == null || jwt.getClaims().get("permissions") == null
+                || jwt.getId() == null
                 || !(roles instanceof List<?> list)
                 || list.isEmpty() || list.stream().anyMatch(role -> !(role instanceof String))) {
                 throw new IllegalArgumentException("Invalid staff token");
             }
+            if (!(permissions instanceof List<?> grants)
+                || grants.stream().anyMatch(grant -> !(grant instanceof String))) {
+                throw new IllegalArgumentException("Invalid staff permissions");
+            }
             return new VerifiedAccessToken(UUID.fromString(jwt.getSubject()),
                 UUID.fromString(jwt.getClaimAsString("sid")),
-                list.stream().map(String.class::cast).toList());
+                list.stream().map(String.class::cast).toList(),
+                grants.stream().map(String.class::cast).toList());
         } catch (JwtException | ClassCastException invalid) {
             throw new IllegalArgumentException("Invalid staff token", invalid);
         }
