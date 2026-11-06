@@ -77,7 +77,9 @@ requests whose direct peer matches that IP use the rightmost
 their direct peer. Do not configure the whole Docker subnet or expose IAM
 directly to untrusted clients. Keep the gateway address stable or update this
 setting when the deployment changes it. Login, email verification requests,
-and password recovery requests share this policy.
+and password recovery requests share this policy. Keep Spring Boot's
+`server.forward-headers-strategy` set to `none`; the IAM resolver must inspect
+the actual connection peer before using the gateway-stamped header.
 
 Set `IAM_CSRF_KEY_BASE64` to a separate Base64-encoded random key of at least 32 bytes. `GET /api/v1/auth/csrf` validates the refresh cookie against the IAM session and returns a non-cacheable, session-bound HMAC proof for cookie-backed operations. Keep this key consistent across Auth instances; rotate it as a coordinated session change.
 
