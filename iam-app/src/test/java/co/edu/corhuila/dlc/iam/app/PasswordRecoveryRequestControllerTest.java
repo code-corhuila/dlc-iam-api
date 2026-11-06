@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import co.edu.corhuila.dlc.iam.adapter.in.http.PasswordRecoveryRequestController;
+import co.edu.corhuila.dlc.iam.adapter.in.http.TrustedGatewayClientAddress;
 import co.edu.corhuila.dlc.iam.application.usecase.RecoveryRateLimitedException;
 import co.edu.corhuila.dlc.iam.application.usecase.RequestPasswordRecoveryService;
 import java.util.UUID;
@@ -22,7 +23,22 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class PasswordRecoveryRequestControllerTest {
     private final RequestPasswordRecoveryService recovery = mock(RequestPasswordRecoveryService.class);
     private final org.springframework.test.web.servlet.MockMvc mvc = MockMvcBuilders
-        .standaloneSetup(new PasswordRecoveryRequestController(recovery)).build();
+        .standaloneSetup(new PasswordRecoveryRequestController(recovery,
+            new TrustedGatewayClientAddress(""))).build();
+
+    @Test
+    void usesGatewayStampedClientIpOnlyFromTrustedPeer() throws Exception {
+        var trustedMvc = MockMvcBuilders.standaloneSetup(
+            new PasswordRecoveryRequestController(recovery,
+                new TrustedGatewayClientAddress("172.25.0.10"))).build();
+        trustedMvc.perform(post("/api/v1/auth/password-recovery-requests")
+                .with(request -> { request.setRemoteAddr("172.25.0.10"); return request; })
+                .contentType("application/json")
+                .header("X-Forwarded-For", "192.0.2.2, 198.51.100.9")
+                .content("{\"email\":\"person@example.test\"}"))
+            .andExpect(status().isOk());
+        verify(recovery).request(eq("person@example.test"), eq("198.51.100.9"), any(UUID.class));
+    }
 
     @Test
     void acknowledgesWithoutReturningIdentityAndUsesConnectionPeer() throws Exception {
