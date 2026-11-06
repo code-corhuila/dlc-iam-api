@@ -2,6 +2,7 @@ package co.edu.corhuila.dlc.iam.adapter.out.security;
 
 import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenIssuer;
 import co.edu.corhuila.dlc.iam.application.port.out.LoginUnitOfWork;
+import co.edu.corhuila.dlc.iam.application.usecase.ApprovedStaffPermissions;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -20,7 +21,6 @@ import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.TreeSet;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -83,7 +83,7 @@ public final class RsaAccessTokenIssuer implements AccessTokenIssuer {
                 "sub", staff.id().toString(), "iss", issuer, "aud", audience,
                 "iat", issuedAt.getEpochSecond(), "exp", expiresAt.getEpochSecond(),
                 "jti", UUID.randomUUID().toString(), "sid", sessionId.toString(),
-                "roles", staff.roles(), "permissions", permissionsFor(staff.roles())));
+                "roles", staff.roles(), "permissions", ApprovedStaffPermissions.forRoles(staff.roles())));
             String signingInput = header + "." + claims;
             Signature signature = Signature.getInstance("SHA256withRSA");
             signature.initSign(privateKey);
@@ -97,27 +97,6 @@ public final class RsaAccessTokenIssuer implements AccessTokenIssuer {
 
     public List<Map<String, Object>> publicJwks() {
         return jwks;
-    }
-
-    /** Fixed role grants from the approved catalog; individual clinical grants are undecided. */
-    private static List<String> permissionsFor(List<String> roles) {
-        if (roles == null || roles.isEmpty()) {
-            throw new IllegalArgumentException("Approved staff roles are required");
-        }
-        var permissions = new TreeSet<String>();
-        for (String role : roles) {
-            if (role == null) throw new IllegalArgumentException("Invalid staff role");
-            switch (role) {
-                case "ADMINISTRATOR", "SECRETARY_ASSISTANT" -> {
-                    permissions.add("patients:read");
-                    permissions.add("patients:register");
-                    permissions.add("patients:write");
-                }
-                case "DENTIST" -> permissions.add("patients:read");
-                default -> throw new IllegalArgumentException("Invalid staff role");
-            }
-        }
-        return List.copyOf(permissions);
     }
 
     private List<Map<String, Object>> loadVerificationKeys(String previousJson) {
