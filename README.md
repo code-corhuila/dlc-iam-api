@@ -99,3 +99,5 @@ mvn clean verify
 The command above builds all three modules and runs the current IAM unit tests.
 
 To build the API runtime image after local tests, run `docker build -t dlc-iam-api:local .` from the repository root. The image packages the Spring Boot application and runs as UID 10001. Supply IAM database, JWT, SMTP, broker, and other required environment variables from the target environment's secret store when running it; the image contains no credentials.
+
+For Compose, select the stage, its private environment file, and the matching network explicitly. From the repository root, set `IAM_STAGE=develop`, `IAM_ENV_FILE=../.env.develop`, and `IAM_PLATFORM_NETWORK=platform` in the shell, then run `docker compose -f deploy/compose.yml config --quiet` and `docker compose -f deploy/compose.yml up -d --build`. The file path is relative to `deploy/`; keep each stage's credentials and database URL in its own ignored file. The service has no published host port, so ingress must be provided separately by the platform. Do not point a `qa` or `main` stage at the development database or network.
