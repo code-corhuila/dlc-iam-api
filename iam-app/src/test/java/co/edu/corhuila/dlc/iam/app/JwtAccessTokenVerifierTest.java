@@ -28,6 +28,7 @@ class JwtAccessTokenVerifierTest {
         assertEquals(user, identity.userId());
         assertEquals(session, identity.sessionId());
         assertEquals(List.of("ADMINISTRATOR"), identity.roles());
+        assertEquals(List.of(), identity.permissions());
     }
 
     @Test

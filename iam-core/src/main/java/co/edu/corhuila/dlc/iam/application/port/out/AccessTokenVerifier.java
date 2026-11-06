@@ -6,5 +6,6 @@ import java.util.UUID;
 public interface AccessTokenVerifier {
     VerifiedAccessToken verify(String token);
 
-    record VerifiedAccessToken(UUID userId, UUID sessionId, List<String> roles) { }
+    record VerifiedAccessToken(UUID userId, UUID sessionId, List<String> roles,
+                               List<String> permissions) { }
 }
