@@ -89,6 +89,8 @@ Set `IAM_CSRF_KEY_BASE64` to a separate Base64-encoded random key of at least 32
 
 IAM checks the staff JWT signature, issuer, audience, expiry, session revocation, account state, inactivity deadline, and current roles. Invalid staff tokens return `active: false`; a database outage returns 503 so callers can fail closed. Token bodies are not logged.
 
+Login and refresh derive JWT permissions from current approved staff roles. Administrator and Secretary/Assistant receive `patients:read`, `patients:register`, and `patients:write`; Dentist receives only `patients:read`. `patients:deactivate` remains withheld until that operation is integrated. Individual Administrator `clinical:read` and `clinical:write` grants are not issued while their grant, audit, and revocation mechanism remains undecided in `dlc-docs`. Patients and Clinical still enforce their own role, assignment, field, and lifecycle checks.
+
 ## IAM event publishing
 
 Set `IAM_RABBITMQ_HOST`, `IAM_RABBITMQ_USER`, `IAM_RABBITMQ_PASSWORD`, and optionally `IAM_RABBITMQ_PORT` and `IAM_OUTBOX_EXCHANGE`. The IAM API declares a durable topic exchange (default `iam.events.v1`) and publishes persistent, version 1 JSON envelopes using routing keys `iam.<EventType>.v1`. The broker must have a matching durable queue binding before events can be marked published. Broker acknowledgement without a route counts as failure. Event IDs stay stable across retries; consumers must deduplicate by `eventId`.
