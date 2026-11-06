@@ -97,3 +97,5 @@ mvn clean verify
 ```
 
 The command above builds all three modules and runs the current IAM unit tests.
+
+To build the API runtime image after local tests, run `docker build -t dlc-iam-api:local .` from the repository root. The image packages the Spring Boot application and runs as UID 10001. Supply IAM database, JWT, SMTP, broker, and other required environment variables from the target environment's secret store when running it; the image contains no credentials.
