@@ -8,8 +8,6 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import java.time.Duration;
 import java.util.Map;
 import java.util.UUID;
@@ -29,16 +27,19 @@ import org.springframework.web.bind.annotation.RestController;
 public final class LoginController {
     private final LoginUseCase login;
     private final IpLoginLimiter limiter;
+    private final TrustedGatewayClientAddress clientAddress;
     private final ObjectMapper json;
     private final String allowedOrigin;
 
-    public LoginController(LoginUseCase login, IpLoginLimiter limiter, ObjectMapper json,
+    public LoginController(LoginUseCase login, IpLoginLimiter limiter,
+                           TrustedGatewayClientAddress clientAddress, ObjectMapper json,
                            @Value("${IAM_AUTH_ALLOWED_ORIGIN}") String allowedOrigin) {
         if (allowedOrigin == null || allowedOrigin.isBlank() || allowedOrigin.contains("*")) {
             throw new IllegalArgumentException("An exact login Origin is required");
         }
         this.login = login;
         this.limiter = limiter;
+        this.clientAddress = clientAddress;
         this.json = json;
         this.allowedOrigin = allowedOrigin;
     }
@@ -53,8 +54,7 @@ public final class LoginController {
             return error(HttpStatus.FORBIDDEN, "FORBIDDEN", "Origin not allowed", correlationId);
         }
         try {
-            // Only the connection peer is trusted. Forwarded headers need a separate proxy policy.
-            limiter.checkAndRecord(peer(request.getRemoteAddr()));
+            limiter.checkAndRecord(clientAddress.resolve(request));
             JsonNode body = rawBody == null || rawBody.length() > 4096
                 ? null : json.readTree(rawBody);
             if (body == null || !body.isObject() || body.size() != 2
@@ -85,17 +85,6 @@ public final class LoginController {
         } catch (DataAccessException unavailable) {
             return error(HttpStatus.SERVICE_UNAVAILABLE, "SERVICE_UNAVAILABLE",
                 "Authentication is temporarily unavailable", correlationId);
-        }
-    }
-
-    private static InetAddress peer(String remoteAddress) {
-        if (remoteAddress == null || !remoteAddress.matches("[0-9a-fA-F:.]+")) {
-            throw new IllegalArgumentException("Invalid connection address");
-        }
-        try {
-            return InetAddress.getByName(remoteAddress);
-        } catch (UnknownHostException invalid) {
-            throw new IllegalArgumentException("Invalid connection address", invalid);
         }
     }
 

@@ -12,6 +12,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import co.edu.corhuila.dlc.iam.adapter.in.http.EmailVerificationRequestController;
+import co.edu.corhuila.dlc.iam.adapter.in.http.TrustedGatewayClientAddress;
 import co.edu.corhuila.dlc.iam.application.usecase.RecoveryRateLimitedException;
 import co.edu.corhuila.dlc.iam.application.usecase.RequestEmailVerificationService;
 import java.util.UUID;
@@ -22,7 +23,22 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 class EmailVerificationRequestControllerTest {
     private final RequestEmailVerificationService verification = mock(RequestEmailVerificationService.class);
     private final org.springframework.test.web.servlet.MockMvc mvc = MockMvcBuilders
-        .standaloneSetup(new EmailVerificationRequestController(verification)).build();
+        .standaloneSetup(new EmailVerificationRequestController(verification,
+            new TrustedGatewayClientAddress(""))).build();
+
+    @Test
+    void usesGatewayStampedClientIpOnlyFromTrustedPeer() throws Exception {
+        var trustedMvc = MockMvcBuilders.standaloneSetup(
+            new EmailVerificationRequestController(verification,
+                new TrustedGatewayClientAddress("172.25.0.10"))).build();
+        trustedMvc.perform(post("/api/v1/auth/email-verification-requests")
+                .with(request -> { request.setRemoteAddr("172.25.0.10"); return request; })
+                .contentType("application/json")
+                .header("X-Forwarded-For", "192.0.2.2, 203.0.113.8")
+                .content("{\"email\":\"person@example.test\"}"))
+            .andExpect(status().isOk());
+        verify(verification).request(eq("person@example.test"), eq("203.0.113.8"), any(UUID.class));
+    }
 
     @Test
     void acknowledgesWithoutDisclosingIdentityAndIgnoresForwardedIp() throws Exception {
