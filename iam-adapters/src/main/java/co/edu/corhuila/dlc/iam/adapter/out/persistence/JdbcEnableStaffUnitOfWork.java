@@ -12,7 +12,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
-public final class JdbcEnableStaffUnitOfWork implements EnableStaffUnitOfWork {
+public class JdbcEnableStaffUnitOfWork implements EnableStaffUnitOfWork {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
 
