@@ -73,7 +73,8 @@ class RoleAssignmentJdbcIT {
             Timestamp.from(created.plusSeconds(86400)));
         var validation = new ValidateSessionService(new JdbcSessionSnapshotReader(jdbc),
             Clock.systemUTC());
-        assertTrue(validation.active(staff, session, List.of("DENTIST")));
+        assertTrue(validation.active(staff, session, List.of("DENTIST"),
+            List.of("patients:read")));
 
         adminJdbc.execute("REVOKE INSERT ON iam.outbox_events FROM iam_runtime");
         try {
@@ -117,7 +118,8 @@ class RoleAssignmentJdbcIT {
         assertEquals(1, jdbc.queryForObject(
             "SELECT count(*) FROM iam.sessions WHERE session_id = ? AND revoked_at IS NOT NULL",
             Integer.class, session));
-        assertFalse(validation.active(staff, session, List.of("DENTIST")));
+        assertFalse(validation.active(staff, session, List.of("DENTIST"),
+            List.of("patients:read")));
         assertEquals(1, jdbc.queryForObject(
             "SELECT count(*) FROM iam.refresh_credentials WHERE credential_id = ? AND revoked_at IS NOT NULL",
             Integer.class, credential));
