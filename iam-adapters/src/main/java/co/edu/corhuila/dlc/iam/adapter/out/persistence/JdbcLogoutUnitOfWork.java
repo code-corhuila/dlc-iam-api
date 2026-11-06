@@ -14,7 +14,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
-public final class JdbcLogoutUnitOfWork implements LogoutUnitOfWork {
+public class JdbcLogoutUnitOfWork implements LogoutUnitOfWork {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
     private final ObjectMapper json;

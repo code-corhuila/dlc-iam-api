@@ -10,7 +10,7 @@ import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionTemplate;
 
 @Repository
-public final class JdbcVerificationRequestUnitOfWork implements VerificationRequestUnitOfWork {
+public class JdbcVerificationRequestUnitOfWork implements VerificationRequestUnitOfWork {
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
 
