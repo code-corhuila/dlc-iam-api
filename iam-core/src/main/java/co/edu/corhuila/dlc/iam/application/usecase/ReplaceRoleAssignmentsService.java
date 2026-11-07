@@ -25,8 +25,9 @@ public final class ReplaceRoleAssignmentsService implements ReplaceRoleAssignmen
                          long expectedVersion, String reason, UUID correlationId) {
         if (actorId == null || userId == null || correlationId == null || roles == null
             || roles.isEmpty() || roles.stream().anyMatch(role -> role == null || !ASSIGNABLE.contains(role))
-            || new HashSet<>(roles).size() != roles.size() || expectedVersion < 0
-            || reason == null || reason.isBlank() || reason.length() > 1000) {
+            || new HashSet<>(roles).size() != roles.size() || expectedVersion < 1
+            || reason == null || reason.isBlank() || !reason.equals(reason.strip())
+            || reason.length() > 1000) {
             throw new IllegalArgumentException("Invalid role assignment request");
         }
         List<String> requested = List.copyOf(roles);
@@ -50,7 +51,7 @@ public final class ReplaceRoleAssignmentsService implements ReplaceRoleAssignmen
                 return view(target, target.version(), target.roles());
             }
             var at = clock.instant();
-            store.replaceRoles(userId, requested, expectedVersion);
+            store.replaceRoles(userId, requested, expectedVersion, actorId, at);
             for (String role : previous) {
                 if (!next.contains(role)) {
                     store.appendAudit(userId, role, "REVOKED", actorId, reason, correlationId, at);
