@@ -67,6 +67,8 @@ During normal operation, the API uses an IAM-scoped runtime role through its per
 
 Set `IAM_AUTH_ALLOWED_ORIGIN` to the exact portal origin and `IAM_LOGIN_IP_DIGEST_KEY_BASE64` to a secret Base64-encoded key of at least 32 random bytes. The login endpoint fails startup without either value. It uses the direct connection peer for its per-IP window; forwarded address headers are ignored until a trusted proxy policy is implemented. Provision the IAM DB display-name, IP-attempt, and expired-lock-audit migrations before deploying this endpoint.
 
+Set `IAM_CSRF_KEY_BASE64` to a separate Base64-encoded random key of at least 32 bytes. `GET /api/v1/auth/csrf` validates the refresh cookie against the IAM session and returns a non-cacheable, session-bound HMAC proof for cookie-backed operations. Keep this key consistent across Auth instances; rotate it as a coordinated session change.
+
 ## Internal session validation
 
 `POST /internal/v1/sessions/validations` accepts `{ "accessToken": "..." }` and returns only `{ "active": true|false }`. Callers present a separate signed service JWT with the `identity:validate` scope. Set its trusted JWKS, issuer, and audience with `IAM_INTERNAL_SERVICE_JWKS_URI`, `IAM_INTERNAL_SERVICE_ISSUER`, and `IAM_INTERNAL_SERVICE_AUDIENCE`. Keep this route off the public Gateway.
