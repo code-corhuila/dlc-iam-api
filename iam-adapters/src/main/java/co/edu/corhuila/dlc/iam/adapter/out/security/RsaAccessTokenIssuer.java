@@ -99,7 +99,7 @@ public final class RsaAccessTokenIssuer implements AccessTokenIssuer {
         return jwks;
     }
 
-    /** Fixed role grants from the approved catalog; individual clinical grants are undecided. */
+    /** Fixed role grants from the approved IAM, Patients and Clinical catalog. */
     private static List<String> permissionsFor(List<String> roles) {
         if (roles == null || roles.isEmpty()) {
             throw new IllegalArgumentException("Approved staff roles are required");
@@ -108,7 +108,13 @@ public final class RsaAccessTokenIssuer implements AccessTokenIssuer {
         for (String role : roles) {
             if (role == null) throw new IllegalArgumentException("Invalid staff role");
             switch (role) {
-                case "ADMINISTRATOR", "SECRETARY_ASSISTANT" -> {
+                case "ADMINISTRATOR" -> {
+                    permissions.add("clinical:read");
+                    permissions.add("patients:read");
+                    permissions.add("patients:register");
+                    permissions.add("patients:write");
+                }
+                case "SECRETARY_ASSISTANT" -> {
                     permissions.add("patients:read");
                     permissions.add("patients:register");
                     permissions.add("patients:write");
