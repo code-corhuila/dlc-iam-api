@@ -89,7 +89,7 @@ Set `IAM_CSRF_KEY_BASE64` to a separate Base64-encoded random key of at least 32
 
 IAM checks the staff JWT signature, issuer, audience, expiry, session revocation, account state, inactivity deadline, and current roles. Invalid staff tokens return `active: false`; a database outage returns 503 so callers can fail closed. Token bodies are not logged.
 
-Login and refresh derive JWT permissions from current approved staff roles. Administrator and Secretary/Assistant receive `patients:read`, `patients:register`, and `patients:write`; Dentist receives only `patients:read`. `patients:deactivate` remains withheld until that operation is integrated. Individual Administrator `clinical:read` and `clinical:write` grants are not issued while their grant, audit, and revocation mechanism remains undecided in `dlc-docs`. Patients and Clinical still enforce their own role, assignment, field, and lifecycle checks.
+Login and refresh derive JWT permissions from current approved staff roles. Administrator receives `clinical:read`, `patients:read`, `patients:register`, and `patients:write`; Secretary/Assistant receives the three Patients permissions; Dentist receives only `patients:read`. Administrator never receives `clinical:write`, and individual clinical grants are outside this policy. `patients:deactivate` remains withheld until that operation is integrated. Role changes revoke existing IAM sessions, so a previous token cannot be reused through current-session validation. Patients and Clinical still enforce their own role, assignment, field, and lifecycle checks. See [ADR-019](https://github.com/code-corhuila/dlc-docs/pull/161) for the approved single-clinic policy.
 
 ## IAM event publishing
 
