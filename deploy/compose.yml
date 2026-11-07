@@ -1,0 +1,19 @@
+name: dlc-iam-api-${IAM_STAGE:?Set IAM_STAGE to develop, qa or main}
+
+services:
+  auth-service:
+    build:
+      context: ..
+    image: dlc-iam-api:${IAM_STAGE}
+    env_file:
+      - ${IAM_ENV_FILE:?Set IAM_ENV_FILE to the stage-specific secret file}
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - platform
+
+networks:
+  platform:
+    external: true
+    name: ${IAM_PLATFORM_NETWORK:?Set IAM_PLATFORM_NETWORK to the stage network}

@@ -18,3 +18,18 @@ spring:
       mail.smtp.connectiontimeout: 3000
       mail.smtp.timeout: 3000
       mail.smtp.writetimeout: 3000
+  rabbitmq:
+    host: ${IAM_RABBITMQ_HOST}
+    port: ${IAM_RABBITMQ_PORT:5672}
+    username: ${IAM_RABBITMQ_USER}
+    password: ${IAM_RABBITMQ_PASSWORD}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+      reply-timeout: 5000
+iam:
+  outbox:
+    exchange: ${IAM_OUTBOX_EXCHANGE:iam.events.v1}
+    poll-delay-ms: ${IAM_OUTBOX_POLL_DELAY_MS:2000}
+    initial-delay-ms: ${IAM_OUTBOX_INITIAL_DELAY_MS:5000}
