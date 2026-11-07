@@ -33,7 +33,7 @@ class InternalSessionValidationControllerTest {
         when(service.decode("caller")).thenReturn(jwt("caller", Map.of("scope", "identity:validate")));
         when(service.decode("without-scope")).thenReturn(jwt("without-scope", Map.of("scope", "other:read")));
         when(staff.verify("staff")).thenReturn(new AccessTokenVerifier.VerifiedAccessToken(
-            USER, SESSION, List.of("DENTIST")));
+            USER, SESSION, List.of("DENTIST"), List.of("patients:read")));
         var eligible = snapshot(null, List.of("DENTIST"));
         var controller = controller(service, staff, (user, session) -> eligible);
         var body = json.readTree("{\"accessToken\":\"staff\"}");
@@ -48,6 +48,10 @@ class InternalSessionValidationControllerTest {
         assertEquals(Map.of("active", false), revoked.validate("Bearer caller", body).getBody());
         var changedRoles = controller(service, staff, (user, session) -> snapshot(null, List.of("ADMINISTRATOR")));
         assertEquals(Map.of("active", false), changedRoles.validate("Bearer caller", body).getBody());
+        when(staff.verify("stale-grant")).thenReturn(new AccessTokenVerifier.VerifiedAccessToken(
+            USER, SESSION, List.of("DENTIST"), List.of("patients:read", "clinical:read")));
+        assertEquals(Map.of("active", false), controller.validate("Bearer caller",
+            json.readTree("{\"accessToken\":\"stale-grant\"}")).getBody());
     }
 
     @Test
@@ -57,7 +61,7 @@ class InternalSessionValidationControllerTest {
         when(service.decode("caller")).thenReturn(jwt("caller", Map.of("scope", "identity:validate")));
         when(staff.verify("bad")).thenThrow(new IllegalArgumentException("invalid"));
         when(staff.verify("staff")).thenReturn(new AccessTokenVerifier.VerifiedAccessToken(
-            USER, SESSION, List.of("DENTIST")));
+            USER, SESSION, List.of("DENTIST"), List.of("patients:read")));
         var reader = (SessionSnapshotReader) (user, session) -> {
             throw new DataAccessResourceFailureException("unavailable");
         };

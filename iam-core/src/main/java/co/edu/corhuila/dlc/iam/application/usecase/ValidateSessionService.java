@@ -15,7 +15,8 @@ public final class ValidateSessionService {
         this.clock = clock;
     }
 
-    public boolean active(UUID userId, UUID sessionId, List<String> tokenRoles) {
+    public boolean active(UUID userId, UUID sessionId, List<String> tokenRoles,
+                          List<String> tokenPermissions) {
         var state = reader.find(userId, sessionId);
         return state != null && "ACTIVE".equals(state.status())
             && state.verifiedAt() != null && state.lockedUntil() == null
@@ -23,6 +24,8 @@ public final class ValidateSessionService {
             && state.inactivityExpiresAt().isAfter(clock.instant())
             && tokenRoles != null && !tokenRoles.isEmpty()
             && tokenRoles.size() == Set.copyOf(tokenRoles).size()
-            && Set.copyOf(tokenRoles).equals(Set.copyOf(state.roles()));
+            && Set.copyOf(tokenRoles).equals(Set.copyOf(state.roles()))
+            && tokenPermissions != null
+            && tokenPermissions.equals(ApprovedStaffPermissions.forRoles(state.roles()));
     }
 }

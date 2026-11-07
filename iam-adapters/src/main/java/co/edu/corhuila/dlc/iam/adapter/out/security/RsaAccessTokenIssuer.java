@@ -2,6 +2,7 @@ package co.edu.corhuila.dlc.iam.adapter.out.security;
 
 import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenIssuer;
 import co.edu.corhuila.dlc.iam.application.port.out.LoginUnitOfWork;
+import co.edu.corhuila.dlc.iam.application.usecase.ApprovedStaffPermissions;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.type.TypeReference;
@@ -82,7 +83,7 @@ public final class RsaAccessTokenIssuer implements AccessTokenIssuer {
                 "sub", staff.id().toString(), "iss", issuer, "aud", audience,
                 "iat", issuedAt.getEpochSecond(), "exp", expiresAt.getEpochSecond(),
                 "jti", UUID.randomUUID().toString(), "sid", sessionId.toString(),
-                "roles", staff.roles(), "permissions", List.of()));
+                "roles", staff.roles(), "permissions", ApprovedStaffPermissions.forRoles(staff.roles())));
             String signingInput = header + "." + claims;
             Signature signature = Signature.getInstance("SHA256withRSA");
             signature.initSign(privateKey);

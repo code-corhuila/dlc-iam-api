@@ -78,6 +78,39 @@ class RsaAccessTokenIssuerTest {
             "current", "https://auth.test.invalid", "dilucca-owner-apis", "[]", json));
     }
 
+    @Test
+    void issuesOnlyApprovedRolePermissionsForLoginAndRefreshTokens() throws Exception {
+        var signer = signer(newKeyPair(), "[]");
+        var decoder = new SessionValidationConfiguration().staffJwtDecoder(
+            signer, "https://auth.test.invalid", "dilucca-owner-apis");
+        Instant now = Instant.now();
+        UUID session = UUID.randomUUID();
+        assertEquals(List.of("clinical:read", "patients:read", "patients:register", "patients:write"),
+            decoder.decode(signer.issue(account(List.of("ADMINISTRATOR")), session,
+                now, now.plusSeconds(3600))).getClaimAsStringList("permissions"));
+        assertEquals(List.of("patients:read", "patients:register", "patients:write"),
+            decoder.decode(signer.issue(account(List.of("SECRETARY_ASSISTANT")), session,
+                now, now.plusSeconds(3600))).getClaimAsStringList("permissions"));
+        assertEquals(List.of("patients:read"),
+            decoder.decode(signer.issue(account(List.of("DENTIST")), session,
+                now, now.plusSeconds(3600))).getClaimAsStringList("permissions"));
+        assertEquals(List.of("clinical:read", "patients:read", "patients:register", "patients:write"),
+            decoder.decode(signer.issue(account(List.of("DENTIST", "ADMINISTRATOR")), session,
+                now, now.plusSeconds(3600))).getClaimAsStringList("permissions"));
+        var refreshed = decoder.decode(signer.issue(account(List.of("ADMINISTRATOR")), session,
+            now.plusSeconds(60), now.plusSeconds(3660))).getClaimAsStringList("permissions");
+        assertEquals(List.of("clinical:read", "patients:read", "patients:register", "patients:write"),
+            refreshed);
+        assertFalse(refreshed.contains("clinical:write"));
+        assertThrows(IllegalStateException.class, () -> signer.issue(account(List.of("PATIENT")),
+            session, now, now.plusSeconds(3600)));
+    }
+
+    private static LoginUnitOfWork.StaffAccount account(List<String> roles) {
+        return new LoginUnitOfWork.StaffAccount(UUID.randomUUID(), "staff@example.test",
+            "Staff", "unused", "ACTIVE", Instant.now(), 0, null, 0, roles);
+    }
+
     private RsaAccessTokenIssuer signer(KeyPair pair, String previousJson) {
         return new RsaAccessTokenIssuer(
             pem("PRIVATE KEY", pair.getPrivate().getEncoded()),

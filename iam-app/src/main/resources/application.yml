@@ -1,3 +1,6 @@
+server:
+  forward-headers-strategy: none
+
 spring:
   application:
     name: dlc-iam-api

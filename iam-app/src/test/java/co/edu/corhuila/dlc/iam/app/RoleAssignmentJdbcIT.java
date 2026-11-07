@@ -1,10 +1,14 @@
 package co.edu.corhuila.dlc.iam.app;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import co.edu.corhuila.dlc.iam.adapter.out.persistence.JdbcRoleAssignmentUnitOfWork;
+import co.edu.corhuila.dlc.iam.adapter.out.persistence.JdbcSessionSnapshotReader;
 import co.edu.corhuila.dlc.iam.application.usecase.ReplaceRoleAssignmentsService;
+import co.edu.corhuila.dlc.iam.application.usecase.ValidateSessionService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Timestamp;
 import java.time.Clock;
@@ -67,6 +71,10 @@ class RoleAssignmentJdbcIT {
             VALUES (?,?,?,?,?)
             """, credential, family, UUID.randomUUID().toString(), Timestamp.from(created),
             Timestamp.from(created.plusSeconds(86400)));
+        var validation = new ValidateSessionService(new JdbcSessionSnapshotReader(jdbc),
+            Clock.systemUTC());
+        assertTrue(validation.active(staff, session, List.of("DENTIST"),
+            List.of("patients:read")));
 
         adminJdbc.execute("REVOKE INSERT ON iam.outbox_events FROM iam_runtime");
         try {
@@ -110,6 +118,8 @@ class RoleAssignmentJdbcIT {
         assertEquals(1, jdbc.queryForObject(
             "SELECT count(*) FROM iam.sessions WHERE session_id = ? AND revoked_at IS NOT NULL",
             Integer.class, session));
+        assertFalse(validation.active(staff, session, List.of("DENTIST"),
+            List.of("patients:read")));
         assertEquals(1, jdbc.queryForObject(
             "SELECT count(*) FROM iam.refresh_credentials WHERE credential_id = ? AND revoked_at IS NOT NULL",
             Integer.class, credential));

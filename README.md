@@ -67,7 +67,19 @@ During normal operation, the API uses an IAM-scoped runtime role through its per
 
 Set `IAM_REGISTRATION_PROOF_KEY_BASE64` to a separate Base64-encoded random key of at least 32 bytes. Keep it consistent across IAM instances: it proves registration request retries without persisting a raw password. Rotate it only with a coordinated plan for existing idempotency keys.
 
-Set `IAM_AUTH_ALLOWED_ORIGIN` to the exact portal origin and `IAM_LOGIN_IP_DIGEST_KEY_BASE64` to a secret Base64-encoded key of at least 32 random bytes. The login endpoint fails startup without either value. It uses the direct connection peer for its per-IP window; forwarded address headers are ignored until a trusted proxy policy is implemented. Provision the IAM DB display-name, IP-attempt, and expired-lock-audit migrations before deploying this endpoint.
+Set `IAM_AUTH_ALLOWED_ORIGIN` to the exact portal origin and `IAM_LOGIN_IP_DIGEST_KEY_BASE64` to a secret Base64-encoded key of at least 32 random bytes. The login endpoint fails startup without either value. Provision the IAM DB display-name, IP-attempt, and expired-lock-audit migrations before deploying this endpoint.
+
+When IAM is reachable through the API Gateway, set `IAM_TRUSTED_GATEWAY_IP` to
+the gateway's exact IP address as seen by the IAM container on the private
+network. By default it is empty and no forwarded address is trusted. Only
+requests whose direct peer matches that IP use the rightmost
+`X-Forwarded-For` address appended by the gateway; all other requests use
+their direct peer. Do not configure the whole Docker subnet or expose IAM
+directly to untrusted clients. Keep the gateway address stable or update this
+setting when the deployment changes it. Login, email verification requests,
+and password recovery requests share this policy. Keep Spring Boot's
+`server.forward-headers-strategy` set to `none`; the IAM resolver must inspect
+the actual connection peer before using the gateway-stamped header.
 
 Set `IAM_CSRF_KEY_BASE64` to a separate Base64-encoded random key of at least 32 bytes. `GET /api/v1/auth/csrf` validates the refresh cookie against the IAM session and returns a non-cacheable, session-bound HMAC proof for cookie-backed operations. Keep this key consistent across Auth instances; rotate it as a coordinated session change.
 
@@ -76,6 +88,10 @@ Set `IAM_CSRF_KEY_BASE64` to a separate Base64-encoded random key of at least 32
 `POST /internal/v1/sessions/validations` accepts `{ "accessToken": "..." }` and returns only `{ "active": true|false }`. Callers present a separate signed service JWT with the `identity:validate` scope. Set its trusted JWKS, issuer, and audience with `IAM_INTERNAL_SERVICE_JWKS_URI`, `IAM_INTERNAL_SERVICE_ISSUER`, and `IAM_INTERNAL_SERVICE_AUDIENCE`. Keep this route off the public Gateway.
 
 IAM checks the staff JWT signature, issuer, audience, expiry, session revocation, account state, inactivity deadline, and current roles. Invalid staff tokens return `active: false`; a database outage returns 503 so callers can fail closed. Token bodies are not logged.
+
+Login and refresh derive JWT permissions from current approved staff roles. Administrator receives `clinical:read`, `patients:read`, `patients:register`, and `patients:write`; Secretary/Assistant receives the three Patients permissions; Dentist receives only `patients:read`. Administrator never receives `clinical:write`, and individual clinical grants are outside this policy. `patients:deactivate` remains withheld until that operation is integrated. Role changes revoke existing IAM sessions, so a previous token cannot be reused through current-session validation. Patients and Clinical still enforce their own role, assignment, field, and lifecycle checks. See [ADR-019](https://github.com/code-corhuila/dlc-docs/pull/161) for the approved single-clinic policy.
+
+The internal session-validation endpoint and IAM's own protected operations compare the token's permissions with the current approved role grants. A token carrying an unapproved grant or an old permission set is inactive even if its signature, session and roles are otherwise valid.
 
 ## IAM event publishing
 
@@ -100,4 +116,4 @@ The command above builds all three modules and runs the current IAM unit tests.
 
 To build the API runtime image after local tests, run `docker build -t dlc-iam-api:local .` from the repository root. The image packages the Spring Boot application and runs as UID 10001. Supply IAM database, JWT, SMTP, broker, and other required environment variables from the target environment's secret store when running it; the image contains no credentials.
 
-For Compose, select the stage, its private environment file, and the matching network explicitly. From the repository root, set `IAM_STAGE=develop`, `IAM_ENV_FILE=../.env.develop`, and `IAM_PLATFORM_NETWORK=platform` in the shell, then run `docker compose -f deploy/compose.yml config --quiet` and `docker compose -f deploy/compose.yml up -d --build`. The file path is relative to `deploy/`; keep each stage's credentials and database URL in its own ignored file. The service has no published host port, so ingress must be provided separately by the platform. Do not point a `qa` or `main` stage at the development database or network.
+For Compose, select the stage, its private environment file, and the matching network explicitly. From the repository root, set `IAM_STAGE=develop`, `IAM_ENV_FILE=../.env.develop`, and `IAM_PLATFORM_NETWORK=platform` in the shell. Set `IAM_TRUSTED_GATEWAY_IP` to the Gateway container's exact IP on that network, then run `docker compose -f deploy/compose.yml config --quiet` and `docker compose -f deploy/compose.yml up -d --build`. Compose requires this value and passes it to Auth in preference to the private environment file. Recheck it after recreating the Gateway. The file path is relative to `deploy/`; keep each stage's credentials and database URL in its own ignored file. The service has no published host port, so ingress must be provided separately by the platform. Do not point a `qa` or `main` stage at the development database or network.
