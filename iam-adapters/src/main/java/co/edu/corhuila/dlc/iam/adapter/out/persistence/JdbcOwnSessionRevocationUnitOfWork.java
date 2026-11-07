@@ -1,6 +1,7 @@
 package co.edu.corhuila.dlc.iam.adapter.out.persistence;
 
 import co.edu.corhuila.dlc.iam.application.port.out.OwnSessionRevocationUnitOfWork;
+import co.edu.corhuila.dlc.iam.application.usecase.SessionRevocationConflictException;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.sql.Timestamp;
@@ -31,7 +32,9 @@ public final class JdbcOwnSessionRevocationUnitOfWork implements OwnSessionRevoc
         try {
             return transactions.execute(status -> operation.apply(new JdbcStore()));
         } catch (DuplicateKeyException conflict) {
-            throw new IllegalStateException("Idempotency key already used for another request", conflict);
+            throw new SessionRevocationConflictException(
+                "IDEMPOTENCY_CONFLICT", "Idempotency key already used for another request",
+                conflict);
         }
     }
 
