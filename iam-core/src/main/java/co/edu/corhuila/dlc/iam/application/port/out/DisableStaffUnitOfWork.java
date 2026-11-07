@@ -21,7 +21,8 @@ public interface DisableStaffUnitOfWork {
                                   UUID correlationId, Instant at);
     }
 
-    record Account(UUID userId, String status, long version, List<String> roles) { }
+    record Account(UUID userId, String email, String name, String status, long version,
+                   List<String> roles, Instant createdAt, Instant updatedAt) { }
     record Attempt(UUID actorId, UUID userId, String reason,
                    long expectedVersion, long resultVersion) { }
 }
