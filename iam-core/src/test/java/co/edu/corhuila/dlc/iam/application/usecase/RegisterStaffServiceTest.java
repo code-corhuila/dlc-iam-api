@@ -106,8 +106,8 @@ class RegisterStaffServiceTest {
         public boolean emailExists(String normalizedEmail) { return emailExists; }
 
         @Override
-        public void createStaff(UUID userId, String normalizedEmail, String hash, String name,
-                                String role, Instant at) {
+        public void createStaff(UUID userId, UUID actorId, String normalizedEmail, String hash,
+                                String name, String role, Instant at) {
             creates++;
             passwordHash = hash;
         }
