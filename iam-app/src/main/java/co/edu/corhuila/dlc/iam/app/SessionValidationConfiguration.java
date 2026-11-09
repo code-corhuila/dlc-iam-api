@@ -5,6 +5,7 @@ import co.edu.corhuila.dlc.iam.application.port.out.AccessTokenVerifier;
 import co.edu.corhuila.dlc.iam.application.usecase.CurrentActorService;
 import co.edu.corhuila.dlc.iam.application.usecase.ValidateSessionService;
 import co.edu.corhuila.dlc.iam.adapter.out.security.RsaAccessTokenIssuer;
+import co.edu.corhuila.dlc.iam.adapter.out.security.RsaServiceTokenSigner;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.source.ImmutableJWKSet;
@@ -13,6 +14,7 @@ import com.nimbusds.jose.proc.SecurityContext;
 import com.nimbusds.jwt.proc.DefaultJWTProcessor;
 import java.time.Clock;
 import java.util.Map;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -58,8 +60,19 @@ public class SessionValidationConfiguration {
     @Bean("serviceJwtDecoder")
     JwtDecoder serviceJwtDecoder(@Value("${IAM_INTERNAL_SERVICE_JWKS_URI}") String jwksUri,
                                  @Value("${IAM_INTERNAL_SERVICE_ISSUER}") String issuer,
-                                 @Value("${IAM_INTERNAL_SERVICE_AUDIENCE}") String audience) {
-        var decoder = NimbusJwtDecoder.withJwkSetUri(jwksUri).build();
+                                 @Value("${IAM_INTERNAL_SERVICE_AUDIENCE}") String audience,
+                                 ObjectProvider<RsaServiceTokenSigner> localIssuer) throws Exception {
+        // ADR-020: when IAM issues service tokens it verifies them with its own key, without calling itself.
+        var local = localIssuer.getIfAvailable();
+        NimbusJwtDecoder decoder;
+        if (local == null) {
+            decoder = NimbusJwtDecoder.withJwkSetUri(jwksUri).build();
+        } else {
+            var processor = new DefaultJWTProcessor<SecurityContext>();
+            processor.setJWSKeySelector(new JWSVerificationKeySelector<>(JWSAlgorithm.RS256,
+                new ImmutableJWKSet<>(JWKSet.parse(Map.of("keys", local.publicJwks())))));
+            decoder = new NimbusJwtDecoder(processor);
+        }
         decoder.setJwtValidator(validator(issuer, audience));
         return decoder;
     }
