@@ -1,14 +1,14 @@
-name: dlc-iam-api-${IAM_STAGE:?Set IAM_STAGE to develop, qa or main}
+name: dlc-iam-api-${IAM_STAGE:-develop}
 
 services:
   auth-service:
     build:
       context: ..
-    image: dlc-iam-api:${IAM_STAGE}
+    image: dlc-iam-api:${IAM_STAGE:-develop}
+    # Secrets (DB, JWT, SMTP, RabbitMQ...) live in the repo-root .env (git-ignored).
+    # Copy .env.example to .env and fill it in. IAM_ENV_FILE overrides the path.
     env_file:
-      - ${IAM_ENV_FILE:?Set IAM_ENV_FILE to the stage-specific secret file}
-    environment:
-      IAM_TRUSTED_GATEWAY_IP: ${IAM_TRUSTED_GATEWAY_IP:?Set the Gateway IP on the stage network}
+      - ${IAM_ENV_FILE:-../.env}
     restart: unless-stopped
     expose:
       - "8080"
@@ -18,4 +18,4 @@ services:
 networks:
   platform:
     external: true
-    name: ${IAM_PLATFORM_NETWORK:?Set IAM_PLATFORM_NETWORK to the stage network}
+    name: ${IAM_PLATFORM_NETWORK:-platform}
