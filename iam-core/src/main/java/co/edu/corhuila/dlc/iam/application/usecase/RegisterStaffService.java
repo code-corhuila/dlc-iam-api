@@ -95,7 +95,9 @@ public final class RegisterStaffService {
                 emailSender.sendEmailVerification(result.staff().email(), result.token(), correlationId);
             } catch (RuntimeException providerFailure) {
                 LOG.log(System.Logger.Level.WARNING,
-                    "IAM registration verification delivery failed; correlationId=" + correlationId);
+                    "IAM registration verification delivery failed; cause="
+                        + providerFailure.getClass().getSimpleName()
+                        + "; correlationId=" + correlationId);
             }
         }
         return result.staff();

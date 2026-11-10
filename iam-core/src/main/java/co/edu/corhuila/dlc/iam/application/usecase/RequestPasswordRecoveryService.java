@@ -71,7 +71,9 @@ public final class RequestPasswordRecoveryService {
             } catch (RuntimeException providerFailure) {
                 // The challenge committed. Preserve the neutral response; a later request issues a new token.
                 LOG.log(System.Logger.Level.WARNING,
-                    "IAM recovery delivery failed; correlationId=" + correlationId);
+                    "IAM recovery delivery failed; cause="
+                        + providerFailure.getClass().getSimpleName()
+                        + "; correlationId=" + correlationId);
             }
         }
     }

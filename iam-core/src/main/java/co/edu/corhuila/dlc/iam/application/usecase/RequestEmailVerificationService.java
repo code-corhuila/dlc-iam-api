@@ -60,7 +60,9 @@ public final class RequestEmailVerificationService {
                 emailSender.sendEmailVerification(normalized, token, correlationId);
             } catch (RuntimeException providerFailure) {
                 LOG.log(System.Logger.Level.WARNING,
-                    "IAM verification delivery failed; correlationId=" + correlationId);
+                    "IAM verification delivery failed; cause="
+                        + providerFailure.getClass().getSimpleName()
+                        + "; correlationId=" + correlationId);
             }
         }
     }
