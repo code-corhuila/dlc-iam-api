@@ -15,12 +15,13 @@ spring:
     password: ${IAM_EMAIL_SMTP_PASSWORD}
     properties:
       mail.smtp.auth: true
-      mail.smtp.starttls.enable: true
-      mail.smtp.starttls.required: true
+      mail.smtp.starttls.enable: ${IAM_EMAIL_SMTP_STARTTLS:true}
+      mail.smtp.starttls.required: ${IAM_EMAIL_SMTP_STARTTLS:true}
+      mail.smtp.ssl.enable: ${IAM_EMAIL_SMTP_SSL:false}
       mail.smtp.ssl.checkserveridentity: true
-      mail.smtp.connectiontimeout: 3000
-      mail.smtp.timeout: 3000
-      mail.smtp.writetimeout: 3000
+      mail.smtp.connectiontimeout: ${IAM_EMAIL_SMTP_CONNECT_TIMEOUT_MS:10000}
+      mail.smtp.timeout: ${IAM_EMAIL_SMTP_TIMEOUT_MS:10000}
+      mail.smtp.writetimeout: ${IAM_EMAIL_SMTP_TIMEOUT_MS:10000}
   rabbitmq:
     host: ${IAM_RABBITMQ_HOST}
     port: ${IAM_RABBITMQ_PORT:5672}
