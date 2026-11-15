@@ -1,0 +1,21 @@
+name: dlc-iam-api-${IAM_STAGE:-develop}
+
+services:
+  auth-service:
+    build:
+      context: ..
+    image: dlc-iam-api:${IAM_STAGE:-develop}
+    # Secrets (DB, JWT, SMTP, RabbitMQ...) live in the repo-root .env (git-ignored).
+    # Copy .env.example to .env and fill it in. IAM_ENV_FILE overrides the path.
+    env_file:
+      - ${IAM_ENV_FILE:-../.env}
+    restart: unless-stopped
+    expose:
+      - "8080"
+    networks:
+      - platform
+
+networks:
+  platform:
+    external: true
+    name: ${IAM_PLATFORM_NETWORK:-platform}

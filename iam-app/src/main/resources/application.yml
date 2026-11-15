@@ -1,0 +1,39 @@
+server:
+  forward-headers-strategy: none
+
+spring:
+  application:
+    name: dlc-iam-api
+  datasource:
+    url: ${IAM_DATABASE_URL}
+    username: ${IAM_DATABASE_USER}
+    password: ${IAM_DATABASE_PASSWORD}
+  mail:
+    host: ${IAM_EMAIL_SMTP_HOST}
+    port: ${IAM_EMAIL_SMTP_PORT:587}
+    username: ${IAM_EMAIL_SMTP_USER}
+    password: ${IAM_EMAIL_SMTP_PASSWORD}
+    properties:
+      mail.smtp.auth: true
+      mail.smtp.starttls.enable: ${IAM_EMAIL_SMTP_STARTTLS:true}
+      mail.smtp.starttls.required: ${IAM_EMAIL_SMTP_STARTTLS:true}
+      mail.smtp.ssl.enable: ${IAM_EMAIL_SMTP_SSL:false}
+      mail.smtp.ssl.checkserveridentity: true
+      mail.smtp.connectiontimeout: ${IAM_EMAIL_SMTP_CONNECT_TIMEOUT_MS:10000}
+      mail.smtp.timeout: ${IAM_EMAIL_SMTP_TIMEOUT_MS:10000}
+      mail.smtp.writetimeout: ${IAM_EMAIL_SMTP_TIMEOUT_MS:10000}
+  rabbitmq:
+    host: ${IAM_RABBITMQ_HOST}
+    port: ${IAM_RABBITMQ_PORT:5672}
+    username: ${IAM_RABBITMQ_USER}
+    password: ${IAM_RABBITMQ_PASSWORD}
+    publisher-confirm-type: correlated
+    publisher-returns: true
+    template:
+      mandatory: true
+      reply-timeout: 5000
+iam:
+  outbox:
+    exchange: ${IAM_OUTBOX_EXCHANGE:iam.events.v1}
+    poll-delay-ms: ${IAM_OUTBOX_POLL_DELAY_MS:2000}
+    initial-delay-ms: ${IAM_OUTBOX_INITIAL_DELAY_MS:5000}
